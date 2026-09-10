@@ -1,9 +1,11 @@
 {
   "name": "nhewr-studio",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "vite --config vite.local.config.ts",
     "build": "vite build --config vite.local.config.ts",
@@ -12,9 +14,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@jsquash/resize": "^2.1.1",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "culori": "4.0.2",
+    "fast-png": "8.0.0",
     "fflate": "0.8.3",
     "lucide-react": "1.31.0",
     "pica": "9.0.1",

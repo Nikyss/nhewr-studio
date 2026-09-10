@@ -5,6 +5,10 @@ function closeTo(data: Uint8ClampedArray, i: number, color: RGBA, tolerance: num
     (data[i + 2] - color[2]) ** 2 <= (tolerance / 100) ** 2 * 3 * 255 ** 2 + 0.01;
 }
 
+function distanceSq(data: Uint8ClampedArray, i: number, color: RGBA) {
+  return (data[i] - color[0]) ** 2 + (data[i + 1] - color[1]) ** 2 + (data[i + 2] - color[2]) ** 2;
+}
+
 function boxBlur(input: Float32Array, width: number, height: number, radius: number) {
   const horizontal = new Float32Array(input.length);
   const output = new Float32Array(input.length);
@@ -52,17 +56,29 @@ export function processPixels(input: Uint8ClampedArray, width: number, height: n
   const output = new Uint8ClampedArray(input);
   const count = width * height;
   const selected = new Float32Array(count);
+  const selectedRule = new Int16Array(count); selectedRule.fill(-1);
   const removed = new Float32Array(count);
-  const canColor = s.mode !== "none" && s.targetRGBA && (s.mode === "solid" || s.sourceRGBA);
+  const rules = s.mode === "replace" ? (s.replacementRGBA?.length ? s.replacementRGBA : s.sourceRGBA && s.targetRGBA ? [{ sourceRGBA: s.sourceRGBA, targetRGBA: s.targetRGBA }] : []) : [];
+  const canColor = s.mode === "solid" ? !!s.targetRGBA : rules.length > 0;
+  const colorLimit = (s.tolerance / 100) ** 2 * 3 * 255 ** 2 + .01;
   for (let n = 0; n < count; n++) {
     const i = n * 4;
     if (!input[i + 3]) continue;
-    if (canColor && (s.mode === "solid" || closeTo(input, i, s.sourceRGBA!, s.tolerance))) selected[n] = 1;
+    if (canColor && s.mode === "solid") selected[n] = 1;
+    else if (canColor) {
+      let best = colorLimit, rule = -1;
+      for (let r = 0; r < rules.length; r++) {
+        const distance = distanceSq(input, i, rules[r].sourceRGBA);
+        if (distance <= best) { best = distance; rule = r; }
+      }
+      if (rule >= 0) { selected[n] = 1; selectedRule[n] = rule; }
+    }
     if (s.removeEnabled && s.removeRGBA && closeTo(input, i, s.removeRGBA, s.removeTolerance)) removed[n] = 1;
   }
   if (s.removeEnabled && s.edgeOnly) borderConnected(removed, width, height, input);
+  const feather = s.removeEnabled && s.removeFeather > 0 ? boxBlur(removed, width, height, 1) : null;
   let weights = selected;
-  if (s.smooth && canColor && s.mode === "replace") {
+  if (s.smooth && rules.length) {
     // Normalize by visible coverage so transparent edges do not acquire dark fringes.
     const coverage = new Float32Array(count);
     const weighted = new Float32Array(count);
@@ -80,12 +96,34 @@ export function processPixels(input: Uint8ClampedArray, width: number, height: n
     const i = n * 4;
     if (input[i + 3]) {
       visible++;
+      if (s.normalizeEnabled && s.paletteRGBA?.length) {
+        const limit = (s.normalizeTolerance / 100) ** 2 * 3 * 255 ** 2 + .01;
+        let best = limit, match: RGBA | null = null;
+        for (const color of s.paletteRGBA) {
+          const distance = distanceSq(input, i, color);
+          if (distance <= best) { best = distance; match = color; }
+        }
+        if (match) for (let c = 0; c < 3; c++) output[i + c] = match[c];
+      }
       const amount = weights[n];
       if (canColor && amount > 0) {
-        for (let c = 0; c < 3; c++) output[i + c] = input[i + c] * (1 - amount) + s.targetRGBA![c] * amount;
-        output[i + 3] *= 1 - amount + amount * s.targetRGBA![3] / 255;
+        let target = s.targetRGBA;
+        if (s.mode === "replace") {
+          let rule = selectedRule[n];
+          if (rule < 0) {
+            let best = Infinity;
+            for (let r = 0; r < rules.length; r++) { const distance = distanceSq(input, i, rules[r].sourceRGBA); if (distance < best) { best = distance; rule = r; } }
+          }
+          target = rule >= 0 ? rules[rule].targetRGBA : null;
+        }
+        if (target) {
+          for (let c = 0; c < 3; c++) output[i + c] = output[i + c] * (1 - amount) + target[c] * amount;
+          output[i + 3] *= 1 - amount + amount * target[3] / 255;
+        }
       }
-      if (removed[n]) output[i + 3] = 0;
+      const removeAmount = Math.max(0, Math.min(100, s.removeStrength)) / 100;
+      if (removed[n]) output[i + 3] *= 1 - removeAmount;
+      else if (feather) output[i + 3] *= 1 - feather[n] * s.removeFeather / 100 * removeAmount;
       if (s.filter === "grayscale") {
         const gray = output[i] * .2126 + output[i + 1] * .7152 + output[i + 2] * .0722;
         output[i] = output[i + 1] = output[i + 2] = gray;

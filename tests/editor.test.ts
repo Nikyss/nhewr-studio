@@ -1,9 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { createCanvas as nativeCanvas, ImageData, loadImage } from "@napi-rs/canvas";
 import { unzipSync } from "fflate";
 import { defaultSettings, type Asset, type PixelSettings } from "../lib/editor-types";
 import { processPixels } from "../lib/pixels";
+import { decode, encode } from "fast-png";
+import { decodePng, pngBlob, rasterCanvas, readRaster, transformRaster } from "../lib/raster";
+import { enhanceRaster } from "../lib/quality";
 
 Object.assign(globalThis, { ImageData, document: { createElement: (tag: string) => {
   if (tag !== "canvas") throw new Error(`Unexpected element: ${tag}`);
@@ -15,7 +20,13 @@ Object.assign(globalThis, { ImageData, document: { createElement: (tag: string) 
   } }); return canvas;
 } } });
 
-const { colorRGBA, colorHex, colorCSS, createCanvas, renderAsset, exportBlob, makeZip, validateSettings, safeName } = await import("../lib/image-editor");
+const networkFetch = globalThis.fetch;
+globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+  const url = input instanceof Request ? input.url : String(input);
+  return url.startsWith("file:") ? readFile(fileURLToPath(url)).then(data => new Response(data)) : networkFetch(input, init);
+}) as typeof fetch;
+
+const { colorRGBA, colorHex, colorCSS, createCanvas, renderAsset, exportBlob, makeZip, validateSettings, safeName, sampleColor, importAsset } = await import("../lib/image-editor");
 const source = new Uint8ClampedArray([0, 0, 0, 255, 0, 0, 0, 128, 255, 255, 255, 255, 25, 26, 27, 0]);
 const options: PixelSettings = { ...defaultSettings, source: "#000", target: "#1677aa", tolerance: 0, sourceRGBA: [0, 0, 0, 255], targetRGBA: [22, 119, 170, 255], removeRGBA: null };
 
@@ -49,7 +60,7 @@ test("smoothing blends a selection boundary while preserving opacity", () => {
 test("edge-only background removal preserves enclosed regions of the same color", () => {
   const data = new Uint8ClampedArray(5 * 5 * 4);
   for (let n = 0; n < 25; n++) { data[n * 4 + 3] = 255; const x = n % 5, y = Math.floor(n / 5); if (x === 0 || y === 0 || x === 4 || y === 4 || (x === 2 && y === 2)) data.fill(255, n * 4, n * 4 + 3); }
-  const config = { ...options, mode: "none" as const, removeEnabled: true, removeRGBA: [255, 255, 255, 255] as [number, number, number, number], removeTolerance: 0, edgeOnly: true };
+  const config = { ...options, mode: "none" as const, removeEnabled: true, removeRGBA: [255, 255, 255, 255] as [number, number, number, number], removeTolerance: 0, removeStrength: 100, edgeOnly: true };
   const result = processPixels(data, 5, 5, config);
   assert.equal(result.data[3], 0); assert.equal(result.data[(2 * 5 + 2) * 4 + 3], 255);
   const all = processPixels(data, 5, 5, { ...config, edgeOnly: false }); assert.equal(all.data[(2 * 5 + 2) * 4 + 3], 0);
@@ -158,4 +169,147 @@ test("batch ZIP retains both independently named files byte for byte", async () 
   const extracted = unzipSync(new Uint8Array(await zip.arrayBuffer()));
   assert.deepEqual(Object.keys(extracted), ["01-icone.png", "02-icone.png"]); assert.deepEqual(extracted["02-icone.png"], data);
   assert.equal(safeName("../icone.png"), "..-icone");
+});
+
+test("PNG import, eyedropper and same-color export keep FCAEE3 at every nonzero alpha", async () => {
+  const data = new Uint8ClampedArray(256 * 4);
+  for (let a = 0; a <= 255; a++) data.set([252,174,227,a], a * 4);
+  const asset = await importAsset(new File([new Uint8Array(encode({ width:256, height:1, channels:4, depth:8, data }))], "exact.png", {type:"image/png"}));
+  try {
+    assert.deepEqual(readRaster(asset.canvas).data, data);
+    for (let a = 1; a <= 255; a++) assert.equal(sampleColor(asset.canvas,a,0), "#fcaee3");
+    const result = await renderAsset(asset, {...asset.settings, source:"#fcaee3", target:"#fcaee3", tolerance:0});
+    assert.equal(result.changed, 0);
+    const png = decode(new Uint8Array(await (await exportBlob(result.canvas,"png",92,"")).arrayBuffer()));
+    assert.deepEqual([...png.data], [...data]);
+  } finally { URL.revokeObjectURL(asset.url); }
+});
+
+test("FF7020 is stored exactly for alpha 1-255 through repeated PNG export and import", async () => {
+  const data = new Uint8ClampedArray(256 * 4);
+  for (let a = 0; a <= 255; a++) data.set([252,174,227,a], a * 4);
+  const canvas = rasterCanvas({width:256,height:1,data});
+  const asset = {...fixture(), width:256, height:1, canvas};
+  const result = await renderAsset(asset, {...defaultSettings, source:"#FCAEE3",target:"#FF7020",tolerance:0});
+  let png = new Uint8Array(await (await exportBlob(result.canvas,"png",92,"")).arrayBuffer());
+  for (let round = 0; round < 3; round++) {
+    const raster = decodePng(png)!;
+    for (let a = 1; a <= 255; a++) assert.deepEqual([...raster.data.subarray(a*4,a*4+4)], [255,112,32,a]);
+    assert.equal(raster.data[3],0);
+    png = new Uint8Array(await pngBlob(raster).arrayBuffer());
+  }
+});
+
+test("PNG palette, grayscale and 16-bit channels decode without canvas round trips", () => {
+  const indexed = encode({width:2,height:1,depth:8,channels:1,data:new Uint8Array([0,1]),palette:[[252,174,227,63],[255,112,32,255]]});
+  assert.deepEqual([...decodePng(indexed)!.data], [252,174,227,63,255,112,32,255]);
+  const gray = encode({width:2,height:1,depth:8,channels:2,data:new Uint8Array([70,17,140,255])});
+  assert.deepEqual([...decodePng(gray)!.data], [70,70,70,17,140,140,140,255]);
+  const high = encode({width:1,height:1,depth:16,channels:4,data:new Uint16Array([65535,112*257,32*257,128*257])});
+  assert.deepEqual([...decodePng(high)!.data], [255,112,32,128]);
+  assert.equal(decodePng(new Uint8Array([1,2,3])),null);
+});
+
+test("rotation, mirroring and padding retain exact semitransparent RGB channels", () => {
+  const raster = {width:2,height:1,data:new Uint8ClampedArray([255,112,32,5,252,174,227,63])};
+  const output = transformRaster(raster,{rotation:90,flipX:true,flipY:false,padding:1},null);
+  assert.deepEqual([...output.data.subarray((1*3+1)*4,(1*3+2)*4)], [252,174,227,63]);
+  assert.deepEqual([...output.data.subarray((2*3+1)*4,(2*3+2)*4)], [255,112,32,5]);
+});
+
+test("resize retains a uniform corporate RGB without making transparent pixels opaque", async () => {
+  const data=new Uint8ClampedArray(16*16*4);
+  for(let n=0;n<256;n++) data.set([255,112,32,n%16<8?128:0],n*4);
+  const canvas=rasterCanvas({width:16,height:16,data});
+  const asset={...fixture(),width:16,height:16,canvas};
+  const result=await renderAsset(asset,{...defaultSettings,mode:"none",resizeEnabled:true,width:8,height:8});
+  const out=readRaster(result.canvas).data;
+  for(let n=0;n<64;n++) if(out[n*4+3]) assert.deepEqual([...out.subarray(n*4,n*4+3)],[255,112,32]);
+  assert.equal(out[7*4+3],0);
+});
+
+test("quality is opt-in and leaves the original raster intact", async () => {
+  const input = { width: 2, height: 1, data: new Uint8ClampedArray([255,112,32,63,1,2,3,0]) };
+  assert.equal(await enhanceRaster(input, defaultSettings), input);
+  const output = await enhanceRaster(input, { ...defaultSettings, qualityEnabled: true, qualityScale: 1, edgeSoftness: 0 });
+  assert.deepEqual(output.data, input.data);
+});
+
+test("1x, 2x and 4x soften the silhouette without creating new corporate RGB values", async () => {
+  const input = { width: 12, height: 12, data: new Uint8ClampedArray(12 * 12 * 4) };
+  for (let y = 3; y < 9; y++) for (let x = 3; x <= y; x++) input.data.set([255,112,32,255], (y * 12 + x) * 4);
+  const original = new Uint8ClampedArray(input.data);
+  for (const qualityScale of [1, 2, 4]) {
+    const output = await enhanceRaster(input, { ...defaultSettings, qualityEnabled: true, qualityScale });
+    assert.equal(output.width, 12 * qualityScale); assert.equal(output.height, 12 * qualityScale);
+    let partial = 0;
+    for (let i = 0; i < output.data.length; i += 4) if (output.data[i + 3]) {
+      assert.deepEqual([...output.data.subarray(i, i + 3)], [255,112,32]);
+      if (output.data[i + 3] < 255) partial++;
+    }
+    assert.ok(partial > 0); assert.equal(output.data[3], 0);
+    const decoded = decodePng(new Uint8Array(await pngBlob(output).arrayBuffer()))!;
+    assert.deepEqual(decoded.data, output.data);
+  }
+  assert.deepEqual(input.data, original);
+});
+
+test("protected multicolor upscale only uses source RGB, while interpolation can mix colors", async () => {
+  const input = {width: 4, height: 1, data: new Uint8ClampedArray([255,0,0,255,255,0,0,255,0,0,255,255,0,0,255,255])};
+  const settings = {...defaultSettings, qualityEnabled: true, qualityScale: 4, edgeSoftness: 0};
+  const protectedOutput = await enhanceRaster(input, settings);
+  for(let i=0;i<protectedOutput.data.length;i+=4) assert.ok(protectedOutput.data[i] === 255 || protectedOutput.data[i+2] === 255);
+  const blended = await enhanceRaster(input, {...settings, preserveColors: false, qualityMethod: "magicKernelSharp2021"});
+  assert.ok(blended.data.some((v,i) => i%4 === 0 && v>0 && v<255));
+});
+
+test("upscale rejects oversized dimensions, invalid factors and cancellation", async () => {
+  const input = {width: 4096, height: 4096, data: new Uint8ClampedArray(0)};
+  await assert.rejects(enhanceRaster(input, {...defaultSettings, qualityEnabled: true, qualityScale: 4}));
+  await assert.rejects(enhanceRaster(input, {...defaultSettings, qualityEnabled: true, qualityScale: 3}));
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(enhanceRaster({width:1,height:1,data:new Uint8ClampedArray(4)}, {...defaultSettings,qualityEnabled:true}, controller.signal), {name: "AbortError"});
+});
+
+test("feathering removes selected pixels fully and softens neighbouring alpha without changing RGB", () => {
+  const input = new Uint8ClampedArray([255,255,255,255,255,112,32,255,255,112,32,255]);
+  const result = processPixels(input,3,1,{...options,mode:"none",removeEnabled:true,removeRGBA:[255,255,255,255],removeTolerance:0,removeStrength:100,removeFeather:100});
+  assert.equal(result.data[3],0); assert.ok(result.data[7]>0 && result.data[7]<255);
+  assert.deepEqual([...result.data.subarray(4,7)],[255,112,32]); assert.equal(result.data[11],255);
+  const disabled = processPixels(input,3,1,{...options,mode:"none",removeEnabled:false,removeFeather:100});
+  assert.deepEqual(disabled.data,input);
+});
+
+test("multiple fixed replacements are applied together and choose the nearest source", () => {
+  const data = new Uint8ClampedArray([253,174,228,255,72,8,120,255,252,246,246,255]);
+  const result = processPixels(data,3,1,{...options,sourceRGBA:null,targetRGBA:null,replacementRGBA:[
+    {sourceRGBA:[253,174,228,255],targetRGBA:[255,0,0,255]},
+    {sourceRGBA:[72,8,120,255],targetRGBA:[0,160,255,255]},
+  ]});
+  assert.deepEqual([...result.data],[255,0,0,255,0,160,255,255,252,246,246,255]);
+  assert.equal(result.changed,2);
+});
+
+test("tone normalization merges small variations but preserves distant colors", () => {
+  const data = new Uint8ClampedArray([100,100,100,255,104,102,103,255,200,20,180,255]);
+  const result = processPixels(data,3,1,{...options,mode:"none",targetRGBA:null,sourceRGBA:null,normalizeEnabled:true,normalizeTolerance:3,paletteRGBA:[[100,100,100,255],[200,20,180,255]]});
+  assert.deepEqual([...result.data],[100,100,100,255,100,100,100,255,200,20,180,255]);
+});
+
+test("background removal progresses from 0 to 50 to 100 percent", () => {
+  const input = new Uint8ClampedArray([255,112,32,255]);
+  const config = {...options,mode:"none" as const,removeEnabled:true,removeRGBA:[255,112,32,255] as [number,number,number,number],removeTolerance:0};
+  assert.equal(processPixels(input,1,1,{...config,removeStrength:0}).data[3],255);
+  assert.equal(processPixels(input,1,1,{...config,removeStrength:50}).data[3],128);
+  assert.equal(processPixels(input,1,1,{...config,removeStrength:100}).data[3],0);
+});
+
+test("quality composes with recolor, resize and independent image settings", async () => {
+  const asset = fixture();
+  const settings = {...asset.settings,target:"#FF7020",qualityEnabled:true,qualityScale:4,resizeEnabled:true,width:5,height:4};
+  const result = await renderAsset(asset,settings);
+  assert.equal(result.canvas.width,20); assert.equal(result.canvas.height,16);
+  for(let i=0,data=readRaster(result.canvas).data;i<data.length;i+=4) if(data[i+3]) assert.deepEqual([...data.subarray(i,i+3)],[255,112,32]);
+  const originalResult = await renderAsset(asset);
+  assert.equal(originalResult.canvas.width,10); assert.equal(asset.settings.qualityEnabled,false);
 });

@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Nhewr Studios V1.0.2
+title Nhewr Studios V1.0.3
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\iniciar.ps1" %*
 if errorlevel 1 (
   echo.

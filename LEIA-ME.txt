@@ -1,4 +1,4 @@
-NHEWR STUDIOS V1.0.2
+NHEWR STUDIOS V1.0.3
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra INICIAR.bat.
@@ -36,6 +36,17 @@ Se houver outro programa na porta 5173, uma porta livre sera escolhida.
 Nenhum aplicativo existente e encerrado pelo inicializador.
 
 Creditos do projeto: creditos\criador.txt
+
+NOVO NA V1.0.3
+Melhorar qualidade: ampliacao 1x/2x/4x com jSquash/Squoosh WebAssembly,
+contorno transparente mais suave e RGB protegido para icones.
+Nao usa IA e nao recupera detalhes ausentes no arquivo pequeno.
+Transparencia com remocao gradual de 0% a 100% e suavizacao do recorte.
+Menos bordas decorativas, exemplo com a mascote e correcoes de RGB no PNG.
+Varias trocas de cor podem ser fixadas na mesma imagem. A opcao de
+padronizacao une tons quase iguais e preserva cores muito diferentes.
+Consulte README.md e CHANGELOG.md para detalhes e limitacoes.
+Atualizacao: extraia esta versao em uma nova pasta.
 
 VARIAS IMAGENS
 Importe varios arquivos juntos ou adicione mais durante a edicao.

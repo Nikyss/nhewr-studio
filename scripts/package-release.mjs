@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const { version } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const name = `Nhewr-Studios-V${version}`;
 const files = {};
-const include = ['app', 'components', 'creditos', 'hooks', 'lib', 'public', 'release', 'scripts', 'src', 'tests', 'vendor', '.gitattributes', '.gitignore', 'index.html', 'INICIAR.bat', 'LEIA-ME.txt', 'README.md', 'package.json', 'package-lock.json', 'postcss.config.mjs', 'tsconfig.json', 'vite.local.config.ts'];
+const include = ['app', 'components', 'creditos', 'hooks', 'lib', 'public', 'release', 'scripts', 'src', 'tests', 'vendor', '.gitattributes', '.gitignore', 'index.html', 'INICIAR.bat', 'LEIA-ME.txt', 'README.md', 'CHANGELOG.md', 'package.json', 'package-lock.json', 'postcss.config.mjs', 'tsconfig.json', 'vite.local.config.ts'];
 
 async function add(relative) {
   const absolute = path.join(root, relative);
