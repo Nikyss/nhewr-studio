@@ -27,6 +27,8 @@ O pacote de distribuição inclui a interface compilada. No código-fonte baixad
 
 Com o conta-gotas ou uma ferramenta manual ativa, Alt+arrastar ou botão do meio move a imagem. Borracha, balde e laço atuam na prévia Original e entram no histórico de desfazer/refazer. Escape sai da captura ou cancela o gesto atual. O fundo da prévia não é adicionado ao arquivo exportado. O original é preservado.
 
+A prévia mantém os pixels sem interpolação durante a exibição. Isso evita que um color picker externo leia, por exemplo, `#FE7020` na tela quando o PNG contém exatamente `#FF7020`. A validação do arquivo continua sendo feita pelo PNG exportado.
+
 ## Desenvolvimento
 
 ```sh

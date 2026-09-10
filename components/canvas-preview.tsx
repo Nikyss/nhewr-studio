@@ -59,12 +59,21 @@ export default function CanvasPreview({ canvas, label, background, inspectRgb = 
 
   useEffect(() => {
     if (!display.current || !canvas) return;
-    display.current.width = canvas.width;
-    display.current.height = canvas.height;
     const pixels = new Uint8ClampedArray(raster!.data);
     if (inspectRgb) for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) pixels[i] = 255;
-    display.current.getContext("2d", { colorSpace: "srgb" })!.putImageData(new ImageData(pixels, canvas.width, canvas.height), 0, 0);
-  }, [canvas, raster, inspectRgb]);
+    const source = document.createElement("canvas");
+    source.width = canvas.width;
+    source.height = canvas.height;
+    const sourceContext = source.getContext("2d", { colorSpace: "srgb" })!;
+    sourceContext.putImageData(new ImageData(pixels, canvas.width, canvas.height), 0, 0);
+    const bitmapWidth = camera.scale < 1 ? Math.max(1, Math.round(canvas.width * camera.scale)) : canvas.width;
+    const bitmapHeight = camera.scale < 1 ? Math.max(1, Math.round(canvas.height * camera.scale)) : canvas.height;
+    display.current.width = bitmapWidth;
+    display.current.height = bitmapHeight;
+    const context = display.current.getContext("2d", { colorSpace: "srgb" })!;
+    context.imageSmoothingEnabled = false;
+    context.drawImage(source, 0, 0, bitmapWidth, bitmapHeight);
+  }, [canvas, raster, inspectRgb, camera.scale]);
 
   useLayoutEffect(() => {
     if (!canvas) return;
@@ -145,7 +154,9 @@ export default function CanvasPreview({ canvas, label, background, inspectRgb = 
   function updateEraseCursor(clientX: number, clientY: number) {
     if (erase?.tool !== "eraser" || !stage.current || !pointAt(clientX, clientY)) { setEraseCursor(null); return; }
     const rect = stage.current.getBoundingClientRect();
-    setEraseCursor({ left: clientX - rect.left, top: clientY - rect.top, size: Math.max(4, Math.min(1200, erase.size * camera.scale)) });
+    const imageRect = display.current?.getBoundingClientRect();
+    const displayScale = imageRect && canvas ? imageRect.width / canvas.width : camera.scale;
+    setEraseCursor({ left: clientX - rect.left, top: clientY - rect.top, size: Math.max(4, Math.min(1200, erase.size * displayScale)) });
   }
 
   useEffect(() => {
@@ -157,7 +168,12 @@ export default function CanvasPreview({ canvas, label, background, inspectRgb = 
     setEraseCursor(null);
   }, [erase?.tool]);
 
-  const imageStyle = canvas ? { position: "absolute" as const, left: camera.x, top: camera.y, width: canvas.width * camera.scale, height: canvas.height * camera.scale, maxWidth: "none" } : undefined;
+  const displayWidth = canvas ? Math.max(1, Math.round(canvas.width * camera.scale)) : 0;
+  const displayHeight = canvas ? Math.max(1, Math.round(canvas.height * camera.scale)) : 0;
+  const imageStyle = canvas ? { position: "absolute" as const, left: Math.round(camera.x), top: Math.round(camera.y), width: displayWidth, height: displayHeight, maxWidth: "none" } : undefined;
+  // The external color picker reads the composited screen pixel. CSS interpolation
+  // must never invent a nearby channel value between source pixels.
+  const imageRendering = "pixelated";
 
   return <>
     <div className="preview-navigation" role="group" aria-label={`Zoom: ${label}`}>
@@ -229,7 +245,7 @@ export default function CanvasPreview({ canvas, label, background, inspectRgb = 
       }}
       onPointerCancel={() => { pointer.current = null; drag.current = null; setDragging(false); setActiveGesture(null); setEraseCursor(null); setHover(null); onHover(null); }}
       onPointerLeave={() => { pointer.current = null; if (!drag.current) { setHover(null); setEraseCursor(null); onHover(null); } }}>
-      {canvas ? <canvas ref={display} aria-label={label} role="img" style={{ ...imageStyle, imageRendering: inspectRgb || camera.scale >= 4 ? "pixelated" : "auto" }} /> : <div className="preview-placeholder"><ScanLine size={34} strokeWidth={1} /><span>Prévia do resultado</span></div>}
+      {canvas ? <canvas ref={display} aria-label={label} role="img" style={{ ...imageStyle, imageRendering }} /> : <div className="preview-placeholder"><ScanLine size={34} strokeWidth={1} /><span>Prévia do resultado</span></div>}
       {canvas && gesture && <svg className="erase-overlay" aria-hidden="true" viewBox={`0 0 ${canvas.width} ${canvas.height}`} style={imageStyle}>
         {gesture.type === "eraser" ? <polyline points={gesture.points.map(point => `${point.x},${point.y}`).join(" ")} fill="none" stroke="currentColor" strokeWidth={erase?.size ?? 1} strokeLinecap="round" strokeLinejoin="round" /> : gesture.points.length >= 3 ? <polygon points={gesture.points.map(point => `${point.x},${point.y}`).join(" ")} /> : <polyline points={gesture.points.map(point => `${point.x},${point.y}`).join(" ")} fill="none" />}
       </svg>}

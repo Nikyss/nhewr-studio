@@ -23,6 +23,7 @@
 - Testes de ida e volta garantem #FCAEE3 e #FF7020 exatos em PNG, incluindo alfa de 1 a 255.
 - Copiar a cor original para a nova cor usa o valor literal do campo.
 - Inspeção RGB opaca apenas na prévia, sem alterar a transparência exportada.
+- A prévia usa vizinho mais próximo, sem interpolação CSS, para que extensões que capturam a tela não convertam uma cor exata em um tom vizinho durante o zoom.
 - Layout adaptável a janelas estreitas; zoom mantém a imagem centrada ao redimensionar a janela. Rolagem por toque disponível fora da captura.
 - Restaurar Transparência ou Qualidade não apaga ajustes das outras ferramentas.
 - Ampliação combinada com tamanho personalizado faz uma só reamostragem, evitando perda intermediária de cor no modo RGB protegido.
