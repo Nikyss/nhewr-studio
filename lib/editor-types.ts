@@ -44,6 +44,7 @@ export interface Settings {
   eraseTolerance: number;
   eraseOperations: ManualEraseOperation[];
   opacity: number;
+  repairOpacity: boolean;
   backgroundEnabled: boolean;
   background: string;
   resizeEnabled: boolean;
@@ -59,8 +60,7 @@ export interface Settings {
   qualityEnabled: boolean;
   qualityScale: number;
   edgeSoftness: number;
-  preserveColors: boolean;
-  qualityMethod: "lanczos3" | "magicKernelSharp2021";
+  qualityMethod: "triangle" | "lanczos3" | "magicKernelSharp2021";
 }
 
 export const defaultSettings: Settings = {
@@ -69,10 +69,10 @@ export const defaultSettings: Settings = {
   removeEnabled: false, removeColor: "", removeStrength: 0,
   removeTolerance: 10, edgeOnly: true, removeFeather: 0, removals: [],
   eraseTool: "color", eraseSize: 32, eraseStrength: 100, eraseTolerance: 0, eraseOperations: [], opacity: 100,
-  backgroundEnabled: false, background: "", resizeEnabled: false,
+  repairOpacity: true, backgroundEnabled: false, background: "", resizeEnabled: false,
   width: 512, height: 512, lockRatio: true, rotation: 0, flipX: false,
   flipY: false, trim: false, padding: 0, filter: "none",
-  qualityEnabled: false, qualityScale: 2, edgeSoftness: 35, preserveColors: true, qualityMethod: "lanczos3",
+  qualityEnabled: false, qualityScale: 2, edgeSoftness: 35, qualityMethod: "lanczos3",
 };
 
 export interface Asset {
@@ -88,6 +88,11 @@ export interface Asset {
   past: Settings[];
   future: Settings[];
   example?: boolean;
+}
+
+export function settingsForAsset(asset: Pick<Asset, "width" | "height" | "colors">): Settings {
+  return { ...defaultSettings, width: asset.width, height: asset.height, source: asset.colors[0] ?? "",
+    replacements: [], removals: [], eraseOperations: [] };
 }
 
 export type ResolvedReplacement = { sourceRGBA: RGBA; targetRGBA: RGBA };

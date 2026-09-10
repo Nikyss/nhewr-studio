@@ -71,7 +71,7 @@ export default function TransparencyAdjustments({ asset, settings: s, patch, pic
 
       {s.eraseOperations.length > 0 && <div className="manual-removal-summary"><span>{s.eraseOperations.length} {s.eraseOperations.length === 1 ? "remoção manual" : "remoções manuais"}</span><button type="button" className="text-action" onClick={() => patch({ eraseOperations: [] })}><Trash2 size={14} />Limpar</button></div>}
     </section>
-    <section className="control-section"><h3>Visibilidade do ícone</h3><RangeField label="Opacidade" value={s.opacity} onChange={opacity => patch({ opacity })} /><div className="range-endpoints"><span>0% · invisível</span><span>100% · original</span></div></section>
+    <section className="control-section"><h3>Visibilidade do ícone</h3><Toggle label="Corrigir opacidade residual" description="Torna alfa 250–254 totalmente opaco no resultado e no PNG. Desative para manter a semitransparência original." checked={s.repairOpacity} onChange={repairOpacity => patch({ repairOpacity })} /><RangeField label="Opacidade" value={s.opacity} onChange={opacity => patch({ opacity })} /><div className="range-endpoints"><span>0% · invisível</span><span>100% · sem redução</span></div></section>
     <section className="control-section"><h3>Fundo do arquivo</h3><Choice label="Fundo de saída" value={s.backgroundEnabled ? "color" : "transparent"} onChange={value => patch({ backgroundEnabled: value === "color" })} options={[{ value: "transparent", label: "Preservar transparência" }, { value: "color", label: "Preencher com uma cor" }]} />{s.backgroundEnabled && <ColorField label="Cor do fundo" value={s.background} onChange={background => patch({ background })} />}</section>
   </fieldset>;
 }

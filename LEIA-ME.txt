@@ -1,4 +1,4 @@
-NHEWR STUDIOS V1.0.3
+NHEWR STUDIOS V1.0.4
 
 1. Extraia o ZIP inteiro para uma pasta do seu computador.
 2. Abra INICIAR.bat.
@@ -39,7 +39,19 @@ Nenhum aplicativo existente e encerrado pelo inicializador.
 
 Creditos do projeto: creditos\criador.txt
 
-NOVO NA V1.0.3
+NOVO NA V1.0.4
+Preservacao obrigatoria de RGB nos tres metodos de ampliacao:
+Bilinear, Lanczos 3 e Magic Kernel. Os filtros suavizam o alfa;
+as cores HEX sao conservadas na previa e no PNG exportado.
+Correcao de opacidade residual (alfa 250-254 para 255) ativada por
+padrao, reversivel, sem tornar o fundo transparente opaco.
+Restaurar os ajustes mantem essa protecao ativa.
+Tooltip exibe alfa exato: 254/255 nao e mais mostrado como 100%.
+47 testes automatizados, incluindo ampliacao e PNG reaberto.
+Pixels semitransparentes nas bordas ainda se misturam com o fundo
+na tela. JPG e WebP com perdas nao garantem o mesmo HEX do PNG.
+
+RECURSOS DA V1.0.3 MANTIDOS
 Melhorar qualidade: ampliacao 1x/2x/4x com jSquash/Squoosh WebAssembly,
 contorno transparente mais suave e RGB protegido para icones.
 Nao usa IA e nao recupera detalhes ausentes no arquivo pequeno.

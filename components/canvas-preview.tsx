@@ -137,7 +137,7 @@ export default function CanvasPreview({ canvas, label, background, inspectRgb = 
     const [r, g, b, a] = raster!.data.subarray(index, index + 4);
     const hex = "#" + [r, g, b].map(n => n.toString(16).padStart(2, "0")).join("").toUpperCase();
     const pixel = { hex, rgba: `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`, alpha: a, x, y, label };
-    setHover({ pixel, left: Math.min(Math.max(6, clientX - rect.left + 16), Math.max(6, rect.width - 177)), top: Math.max(6, clientY - rect.top - 75) });
+    setHover({ pixel, left: Math.min(Math.max(6, clientX - rect.left + 16), Math.max(6, rect.width - 228)), top: Math.max(6, clientY - rect.top - 89) });
     onHover(pixel);
     return pixel;
   }
@@ -250,7 +250,7 @@ export default function CanvasPreview({ canvas, label, background, inspectRgb = 
         {gesture.type === "eraser" ? <polyline points={gesture.points.map(point => `${point.x},${point.y}`).join(" ")} fill="none" stroke="currentColor" strokeWidth={erase?.size ?? 1} strokeLinecap="round" strokeLinejoin="round" /> : gesture.points.length >= 3 ? <polygon points={gesture.points.map(point => `${point.x},${point.y}`).join(" ")} /> : <polyline points={gesture.points.map(point => `${point.x},${point.y}`).join(" ")} fill="none" />}
       </svg>}
       {eraseCursor && <span className="erase-cursor" aria-hidden="true" style={{ left: eraseCursor.left, top: eraseCursor.top, width: eraseCursor.size, height: eraseCursor.size }} />}
-      {hover && !dragging && <div className="pixel-tooltip" style={{ left: hover.left, top: hover.top }}><span className="pixel-swatch checker"><span style={{ background: hover.pixel.alpha ? hover.pixel.hex : "transparent" }} /></span><div><strong>{hover.pixel.alpha ? hover.pixel.hex : "Transparente"}</strong><small>{hover.pixel.x}, {hover.pixel.y} · α {Math.round(hover.pixel.alpha / 255 * 100)}%</small></div></div>}
+      {hover && !dragging && <div className="pixel-tooltip" style={{ left: hover.left, top: hover.top }}><span className="pixel-swatch checker"><span style={{ background: hover.pixel.rgba }} /></span><div><strong>{hover.pixel.alpha ? hover.pixel.hex : "Transparente"}</strong><small>RGB do arquivo · α {hover.pixel.alpha}/255</small><small>{hover.pixel.x}, {hover.pixel.y} · {hover.pixel.alpha === 255 ? "Opaco" : "Semitransparente"}</small></div></div>}
     </div>
   </>;
 }

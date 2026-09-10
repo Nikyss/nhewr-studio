@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { defaultSettings, type Asset, type ExportFormat, type ManualEraseOperation, type Settings, type ToolId } from "@/lib/editor-types";
+import { defaultSettings, settingsForAsset, type Asset, type ExportFormat, type ManualEraseOperation, type Settings, type ToolId } from "@/lib/editor-types";
 import { bytes, canvasBlob, colorHex, colorRGBA, download, exportBlob, importAsset, makeZip, MAX_SESSION_PIXELS, renderAsset, safeName, validateSettings } from "@/lib/image-editor";
 import { Choice, ColorField, IconButton, RangeField, Toggle } from "./editor-controls";
 import Adjustments from "./adjustments";
@@ -217,7 +217,7 @@ export default function Studio() {
   }
 
   const sample = (color: string) => { if (picking) { patch(picking === "removeColor" ? { removeColor: color, removeStrength: 0 } : { [picking]: color }); setPicking(null); toast.success(`Cor capturada: ${color.toUpperCase()}`); } };
-  const reset = () => active && patch({ ...defaultSettings, width: active.width, height: active.height, source: active.colors[0] ?? "" });
+  const reset = () => active && patch(settingsForAsset(active));
   const eraseControl = active && tool === "alpha" && s.eraseTool !== "color" && !picking ? {
     tool: s.eraseTool, size: s.eraseSize, strength: s.eraseStrength, tolerance: s.eraseTolerance,
     onCommit: (operation: ManualEraseOperation) => patch({ eraseOperations: [...s.eraseOperations, operation].slice(-80) }),

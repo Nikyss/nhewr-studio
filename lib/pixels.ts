@@ -194,6 +194,8 @@ export function processPixels(input: Uint8ClampedArray, width: number, height: n
     const i = n * 4;
     if (input[i + 3]) {
       visible++;
+      // Repair near-opaque source fills before intentional alpha edits, never after them.
+      if (s.repairOpacity && output[i + 3] >= 250) output[i + 3] = 255;
       if (s.normalizeEnabled && s.paletteRGBA?.length) {
         const limit = (s.normalizeTolerance / 100) ** 2 * 3 * 255 ** 2 + .01;
         let best = limit, match: RGBA | null = null;

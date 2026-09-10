@@ -1,8 +1,8 @@
 # Nhewr Studios
 
-Editor local de ícones em português. Tema branco e modo escuro neutro, com layout adaptável a janelas estreitas e versão **V1.0.3**. As cores de edição são livres; a paleta de cores salvas começa vazia.
+Editor local de ícones em português. Tema branco e modo escuro neutro, com layout adaptável a janelas estreitas e versão **V1.0.4**. As cores de edição são livres; a paleta de cores salvas começa vazia.
 
-[Baixar a V1.0.3 para Windows](https://github.com/Nikyss/nhewr-studio/releases/tag/v1.0.3) · [Notas da versão](CHANGELOG.md)
+[Baixar a V1.0.4 para Windows](https://github.com/Nikyss/nhewr-studio/releases/tag/v1.0.4) · [Notas da versão](CHANGELOG.md)
 
 ## Abrir no Windows
 
@@ -27,7 +27,9 @@ O pacote de distribuição inclui a interface compilada. No código-fonte baixad
 
 Com o conta-gotas ou uma ferramenta manual ativa, Alt+arrastar ou botão do meio move a imagem. Borracha, balde e laço atuam na prévia Original e entram no histórico de desfazer/refazer. Escape sai da captura ou cancela o gesto atual. O fundo da prévia não é adicionado ao arquivo exportado. O original é preservado.
 
-A prévia mantém os pixels sem interpolação durante a exibição. Isso evita que um color picker externo leia, por exemplo, `#FE7020` na tela quando o PNG contém exatamente `#FF7020`. A validação do arquivo continua sendo feita pelo PNG exportado.
+A prévia usa vizinho mais próximo. Um pixel semitransparente ainda se mistura com o fundo: `#FF7020` com alfa 254/255 pode aparecer como `#FE7020` sobre fundo escuro ou `#FF7121` sobre fundo claro. O tooltip identifica o RGB do arquivo e mostra o alfa inteiro, sem arredondar 254/255 para 100%.
+
+**Corrigir opacidade residual**, ativado por padrão em Alterar cores e Transparência, transforma alfa 250–254 em 255 no resultado e no PNG exportado, mantendo RGB e alfa 0 intactos. A regra vale para qualquer cor, sem lista de HEX especiais. Restaurar os ajustes mantém a proteção ativada. A correção inicial ocorre antes das remoções, da opacidade global e do alfa da nova cor, respeitando essas escolhas. Uma segunda verificação depois do redimensionamento e da melhoria de qualidade corrige a opacidade residual recriada pelos filtros; essa segunda etapa não é aplicada quando há remoções ou transparência intencional nos ajustes. Desative para conservar a semitransparência da origem. O original permanece intacto; bordas com alfa abaixo de 250 continuam semitransparentes e se misturam com o fundo.
 
 ## Desenvolvimento
 
@@ -77,15 +79,15 @@ O conta-gotas interno lê o RGB do arquivo, junto do alfa. Um pixel semitranspar
 
 1. Importe o ícone e abra **Melhorar qualidade**.
 2. Ative a melhoria e escolha 1× (mesmo tamanho), 2× ou 4×.
-3. Para ícones com cores obrigatórias, mantenha **Preservar RGB · ícones**. O contorno é suavizado pelo alfa; os canais RGB são copiados de pixels visíveis, sem criar tons intermediários nesta etapa.
-4. Ajuste **Suavizar contorno transparente**. Valores altos podem deixar traços finos mais suaves ou menos opacos. Compare a 100% e exporte em PNG.
-5. Para fotos, gradientes ou desenhos com transições internas, escolha **Imagem suave · Lanczos 3** ou **Imagem nítida · Magic Kernel**. Esses métodos interpolam cores; os valores HEX podem mudar.
+3. Escolha **Contorno leve · Bilinear**, **Contorno suave · Lanczos 3** ou **Contorno nítido · Magic Kernel**. Todos preservam obrigatoriamente o RGB dos pixels visíveis da entrada. Os métodos alteram a reamostragem do alfa, sem usar os canais RGB interpolados pelo filtro.
+4. Ajuste **Suavização extra do contorno**. Valores altos podem deixar traços finos mais suaves ou menos opacos. Compare a 100% e exporte em PNG.
+5. A proteção vale para qualquer HEX e para imagens com várias cores. Não há mais um método que desative a preservação de RGB. O resultado e o PNG exportado usam os mesmos pixels protegidos.
 
-A melhoria começa desligada e é independente para cada imagem, incluindo histórico e exportação em lote. O jSquash deriva do Squoosh e executa algoritmos Rust/WebAssembly inteiramente no dispositivo. Não usa IA nem vetorização e não recupera detalhes ausentes. Em imagens totalmente opacas, a suavização do contorno transparente não tem efeito; remova o fundo primeiro ou use um método de imagem para transições internas. O modo RGB protegido conserva também as divisões internas entre cores, que podem continuar serrilhadas.
+A melhoria começa desligada e é independente para cada imagem, incluindo histórico e exportação em lote. O jSquash deriva do Squoosh e executa algoritmos Rust/WebAssembly inteiramente no dispositivo. Não usa IA nem vetorização e não recupera detalhes ausentes. Em imagens totalmente opacas, a suavização do contorno transparente não tem efeito. A preservação de RGB conserva também as divisões internas entre cores, que podem continuar serrilhadas. Os métodos foram orientados a ícones com cores exatas; não interpolam gradientes de fotografias.
 
 Com Redimensionar e Melhorar qualidade ativos, as dimensões escolhidas são multiplicadas pela ampliação e aplicadas em uma única reamostragem. A ordem é: cores/remoção/opacidade, recorte, tamanho e melhoria, rotação/espelhamento/margem, fundo. O limite continua 16 MP e 8.192 px por lado, inclusive na saída. O processamento da melhoria roda em um Web Worker e é cancelado quando os ajustes mudam.
 
-Preservar RGB vale para a etapa de qualidade: mesclar cores na aba de cor, filtros e fundo preenchido ainda podem alterar o RGB. Suavizar o contorno altera o alfa e, portanto, a aparência sobre o fundo, mas não o RGB protegido. Para a cor corporativa #FF7020, deixe a mistura de cores desligada, escolha Preservar RGB e mantenha o fundo transparente.
+A preservação obrigatória de RGB vale para a etapa de qualidade: mesclar cores na aba de cor, filtros e fundo preenchido ainda podem alterar o RGB. Suavizar o contorno altera o alfa e, portanto, a aparência sobre o fundo, mas não o RGB armazenado. Para cores obrigatórias, deixe a mistura de cores desligada e mantenha o fundo transparente. Pixels semitransparentes nas bordas ainda se misturam com o fundo na tela.
 
 ## Fundo e Transparência
 
@@ -98,7 +100,7 @@ Preservar RGB vale para a etapa de qualidade: mesclar cores na aba de cor, filtr
 - **Borracha** remove somente o traço feito na imagem, com diâmetro e intensidade ajustáveis.
 - **Balde** captura o RGB clicado e remove de uma vez todos os pixels iguais ou próximos no arquivo.
 - **Laço** acompanha uma linha livre e remove tudo dentro da área quando o gesto é fechado. As ações manuais podem ser desfeitas ou limpas sem alterar o original.
-- **Opacidade**: 100% mantém o alfa original, 0% deixa o ícone invisível. Não torna pixels transparentes opacos.
+- **Opacidade**: 100% não reduz o alfa após a correção residual; 0% deixa o ícone invisível. Pixels com alfa 0 permanecem transparentes.
 - **Preservar transparência** não acrescenta um fundo e não remove automaticamente um fundo já presente. **Preencher com uma cor** adiciona a cor escolhida ao arquivo exportado.
 
 Restaurar esta ferramenta, em Transparência ou Qualidade, restaura apenas os controles dessa aba. Restaurar original, na área de trabalho, continua restaurando todos os ajustes. As ferramentas manuais usam coordenadas do original antes de recorte, redimensionamento ou rotação.

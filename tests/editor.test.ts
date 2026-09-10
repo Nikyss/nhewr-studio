@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createCanvas as nativeCanvas, ImageData, loadImage } from "@napi-rs/canvas";
 import { unzipSync } from "fflate";
-import { defaultSettings, type Asset, type PixelSettings } from "../lib/editor-types";
+import { defaultSettings, settingsForAsset, type Asset, type PixelSettings } from "../lib/editor-types";
 import { processPixels } from "../lib/pixels";
 import { decode, encode } from "fast-png";
 import { decodePng, pngBlob, rasterCanvas, readRaster, transformRaster } from "../lib/raster";
@@ -178,7 +178,7 @@ test("PNG import, eyedropper and same-color export keep FCAEE3 at every nonzero 
   try {
     assert.deepEqual(readRaster(asset.canvas).data, data);
     for (let a = 1; a <= 255; a++) assert.equal(sampleColor(asset.canvas,a,0), "#fcaee3");
-    const result = await renderAsset(asset, {...asset.settings, source:"#fcaee3", target:"#fcaee3", tolerance:0});
+    const result = await renderAsset(asset, {...asset.settings, repairOpacity:false, source:"#fcaee3", target:"#fcaee3", tolerance:0});
     assert.equal(result.changed, 0);
     const png = decode(new Uint8Array(await (await exportBlob(result.canvas,"png",92,"")).arrayBuffer()));
     assert.deepEqual([...png.data], [...data]);
@@ -190,7 +190,7 @@ test("FF7020 is stored exactly for alpha 1-255 through repeated PNG export and i
   for (let a = 0; a <= 255; a++) data.set([252,174,227,a], a * 4);
   const canvas = rasterCanvas({width:256,height:1,data});
   const asset = {...fixture(), width:256, height:1, canvas};
-  const result = await renderAsset(asset, {...defaultSettings, source:"#FCAEE3",target:"#FF7020",tolerance:0});
+  const result = await renderAsset(asset, {...defaultSettings, repairOpacity:false, source:"#FCAEE3",target:"#FF7020",tolerance:0});
   let png = new Uint8Array(await (await exportBlob(result.canvas,"png",92,"")).arrayBuffer());
   for (let round = 0; round < 3; round++) {
     const raster = decodePng(png)!;
@@ -208,6 +208,44 @@ test("PNG palette, grayscale and 16-bit channels decode without canvas round tri
   const high = encode({width:1,height:1,depth:16,channels:4,data:new Uint16Array([65535,112*257,32*257,128*257])});
   assert.deepEqual([...decodePng(high)!.data], [255,112,32,128]);
   assert.equal(decodePng(new Uint8Array([1,2,3])),null);
+});
+
+test("residual opacity repair preserves RGB and gives exact visible fills on light and dark backgrounds after PNG export", async () => {
+  for (const color of [[255,112,32], [252,174,227], [22,119,170], [0,0,0], [255,255,255]]) {
+    const data = new Uint8ClampedArray(256 * 4);
+    for (let a = 0; a <= 255; a++) data.set([...color, a], a * 4);
+    const original = new Uint8ClampedArray(data);
+    const asset = { ...fixture(), width:256, height:1, canvas:rasterCanvas({width:256,height:1,data}) };
+    const result = await renderAsset(asset, {...defaultSettings, mode:"none"});
+    const blob = await exportBlob(result.canvas,"png",92,"");
+    const exported = decodePng(new Uint8Array(await blob.arrayBuffer()))!;
+    assert.deepEqual(data, original);
+    assert.equal(result.changed, 5);
+    for (let a = 0; a <= 255; a++) assert.deepEqual([...exported.data.subarray(a*4,a*4+4)], [...color, a >= 250 ? 255 : a]);
+    const pngImage = await loadImage(Buffer.from(await blob.arrayBuffer()));
+    for (const bg of ["#272727", "#313131", "#e6e6e6", "#ffffff"]) {
+      const surface = nativeCanvas(256,1), context = surface.getContext("2d");
+      context.fillStyle = bg; context.fillRect(0,0,256,1);
+      context.drawImage(pngImage,0,0);
+      for (let a = 250; a <= 255; a++) assert.deepEqual([...context.getImageData(a,0,1,1).data], [...color,255]);
+    }
+  }
+});
+
+test("opacity repair runs before intentional transparency and can be disabled per asset", async () => {
+  const data = new Uint8ClampedArray([255,112,32,254,255,112,32,0]);
+  const asset = {...fixture(),width:2,height:1,canvas:rasterCanvas({width:2,height:1,data})};
+  for (const settings of [
+    {...defaultSettings,mode:"none" as const,opacity:50},
+    {...defaultSettings,mode:"none" as const,removeEnabled:true,removeColor:"#FF7020",removeStrength:50,edgeOnly:false},
+    {...defaultSettings,mode:"none" as const,eraseOperations:[{type:"bucket" as const,point:{x:0,y:0},tolerance:0,strength:50}]},
+    {...defaultSettings,source:"#FF7020",target:"argb(128,22,119,170)"},
+  ]) {
+    const output = readRaster((await renderAsset(asset,settings)).canvas).data;
+    assert.equal(output[3],128); assert.equal(output[7],0);
+  }
+  const unchanged = readRaster((await renderAsset(asset,{...defaultSettings,mode:"none",repairOpacity:false})).canvas);
+  assert.deepEqual(unchanged.data,data);
 });
 
 test("rotation, mirroring and padding retain exact semitransparent RGB channels", () => {
@@ -254,13 +292,15 @@ test("1x, 2x and 4x soften the silhouette without creating new corporate RGB val
   assert.deepEqual(input.data, original);
 });
 
-test("protected multicolor upscale only uses source RGB, while interpolation can mix colors", async () => {
+test("all enlargement kernels preserve separate colors without creating mixed RGB", async () => {
   const input = {width: 4, height: 1, data: new Uint8ClampedArray([255,0,0,255,255,0,0,255,0,0,255,255,0,0,255,255])};
   const settings = {...defaultSettings, qualityEnabled: true, qualityScale: 4, edgeSoftness: 0};
-  const protectedOutput = await enhanceRaster(input, settings);
-  for(let i=0;i<protectedOutput.data.length;i+=4) assert.ok(protectedOutput.data[i] === 255 || protectedOutput.data[i+2] === 255);
-  const blended = await enhanceRaster(input, {...settings, preserveColors: false, qualityMethod: "magicKernelSharp2021"});
-  assert.ok(blended.data.some((v,i) => i%4 === 0 && v>0 && v<255));
+  for (const qualityMethod of ["triangle","lanczos3","magicKernelSharp2021"] as const) {
+    const output = await enhanceRaster(input, {...settings,qualityMethod});
+    const colors = new Set<string>();
+    for(let i=0;i<output.data.length;i+=4) if (output.data[i+3]) colors.add([...output.data.subarray(i,i+3)].join(","));
+    assert.deepEqual(colors,new Set(["255,0,0","0,0,255"]));
+  }
 });
 
 test("upscale rejects oversized dimensions, invalid factors and cancellation", async () => {
@@ -369,4 +409,100 @@ test("quality composes with recolor, resize and independent image settings", asy
   for(let i=0,data=readRaster(result.canvas).data;i<data.length;i+=4) if(data[i+3]) assert.deepEqual([...data.subarray(i,i+3)],[255,112,32]);
   const originalResult = await renderAsset(asset);
   assert.equal(originalResult.canvas.width,10); assert.equal(asset.settings.qualityEnabled,false);
+});
+
+test("quality cannot reintroduce residual opacity after any opaque replacement", async () => {
+  for (const target of ["#FF0000", "#00FF00", "#0000FF", "#1677AA", "#FF7020"]) {
+    const asset = fixture();
+    const result = await renderAsset(asset, {...asset.settings,target,qualityEnabled:true,qualityScale:4});
+    const data = readRaster(result.canvas).data;
+    let opaque = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      assert.ok(data[i+3] < 250 || data[i+3] === 255, `${target}: residual alpha ${data[i+3]}`);
+      if (data[i+3] === 255) {
+        assert.deepEqual([...data.subarray(i,i+3)],colorRGBA(target)!.slice(0,3));
+        opaque++;
+      }
+    }
+    assert.ok(opaque > 0);
+  }
+});
+
+test("restoring and recoloring the mascot preserves every tested HEX at the reported pixel", async () => {
+  const bytes = await readFile(new URL("../public/mascote.png", import.meta.url));
+  const asset = await importAsset(new File([bytes],"mascote.png",{type:"image/png"}));
+  const x = 331, y = 896, index = (y * asset.width + x) * 4;
+  try {
+    assert.equal(readRaster(asset.canvas).data[index+3],254);
+    const source = sampleColor(asset.canvas,x,y)!;
+    for (const target of ["#FF0000","#00FF00","#0000FF","#00FFFF","#7F35C9","#123456","#FFFFFF","#000000"]) {
+      asset.settings = {...asset.settings,repairOpacity:false,target:"#FF7020"};
+      const reset = settingsForAsset(asset);
+      assert.equal(reset.repairOpacity,true);
+      const output = await renderAsset(asset,{...reset,source,target,tolerance:10});
+      const expected = colorRGBA(target)!;
+      assert.deepEqual([...readRaster(output.canvas).data.subarray(index,index+4)],expected);
+      const blob = await exportBlob(output.canvas,"png",100,"");
+      const decoded = decodePng(new Uint8Array(await blob.arrayBuffer()))!;
+      assert.deepEqual([...decoded.data.subarray(index,index+4)],expected);
+      const image = await loadImage(Buffer.from(await blob.arrayBuffer()));
+      for (const background of ["#272727","#e6e6e6"]) {
+        const surface = nativeCanvas(1,1), ctx = surface.getContext("2d");
+        ctx.fillStyle = background; ctx.fillRect(0,0,1,1);
+        ctx.drawImage(image,x,y,1,1,0,0,1,1);
+        assert.deepEqual([...ctx.getImageData(0,0,1,1).data],expected);
+      }
+    }
+    assert.equal(readRaster(asset.canvas).data[index+3],254);
+  } finally { URL.revokeObjectURL(asset.url); }
+});
+
+test("final opacity repair respects near-opaque intentional alpha edits", async () => {
+  const asset = fixture();
+  for (const override of [
+    {opacity:99},
+    {target:"argb(254,255,0,0)"},
+    {removeEnabled:true,removeColor:"#000000",removeStrength:1,edgeOnly:false},
+    {eraseOperations:[{type:"bucket" as const,point:{x:3,y:3},tolerance:0,strength:1}]},
+  ]) {
+    const settings = {...asset.settings,...override};
+    const result = await renderAsset(asset,settings);
+    const alpha = readRaster(result.canvas).data[(3*10+3)*4+3];
+    assert.ok(alpha >= 250 && alpha < 255, `Intentional alpha was reset: ${alpha}`);
+  }
+});
+
+test("all three enlargement modes retain exact replacement RGB through PNG export", async () => {
+  for (const qualityMethod of ["triangle","lanczos3","magicKernelSharp2021"] as const)
+  for (const target of ["#FF0000","#FF7020","#1677AA"]) for (const qualityScale of [1,2,4]) {
+    const asset = fixture();
+    const result = await renderAsset(asset,{...asset.settings,target,qualityEnabled:true,qualityScale,qualityMethod});
+    const blob = await exportBlob(result.canvas,"png",100,"");
+    const decoded = decodePng(new Uint8Array(await blob.arrayBuffer()))!;
+    const expected = colorRGBA(target)!.slice(0,3);
+    for (let i = 0; i < decoded.data.length; i += 4) if (decoded.data[i+3]) {
+      assert.deepEqual([...decoded.data.subarray(i,i+3)],expected, `${qualityMethod} ${target} ${qualityScale}x pixel ${i/4}`);
+      assert.ok(decoded.data[i+3] < 250 || decoded.data[i+3] === 255);
+    }
+    assert.deepEqual(decoded.data,readRaster(result.canvas).data);
+    const opaque = decoded.data.findIndex((value,index) => index % 4 === 3 && value === 255);
+    assert.ok(opaque >= 0);
+    const position = (opaque - 3) / 4;
+    const image = await loadImage(Buffer.from(await blob.arrayBuffer()));
+    for (const background of ["#272727","#e6e6e6"]) {
+      const surface = nativeCanvas(1,1), ctx = surface.getContext("2d");
+      ctx.fillStyle = background; ctx.fillRect(0,0,1,1);
+      ctx.drawImage(image,position % decoded.width,Math.floor(position / decoded.width),1,1,0,0,1,1);
+      assert.deepEqual([...ctx.getImageData(0,0,1,1).data],[...expected,255]);
+    }
+  }
+});
+
+test("the three kernels produce distinct contours while preserving the fill color", async () => {
+  const outputs = new Set<string>();
+  for (const qualityMethod of ["triangle","lanczos3","magicKernelSharp2021"] as const) {
+    const result = await renderAsset(fixture(),{...fixture().settings,qualityEnabled:true,qualityScale:4,qualityMethod});
+    outputs.add(Buffer.from(readRaster(result.canvas).data).toString("base64"));
+  }
+  assert.equal(outputs.size,3);
 });

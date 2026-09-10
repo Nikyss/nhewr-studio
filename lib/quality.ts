@@ -55,36 +55,35 @@ export async function enhanceRaster(input: Raster, s: Settings, signal?: AbortSi
   }
   if (width === input.width && height === input.height) return { ...input, data: source };
   const resized = await resize(new ImageData(new Uint8ClampedArray(source), input.width, input.height), {
-    width, height, method: s.preserveColors ? "lanczos3" : s.qualityMethod,
+    width, height, method: s.qualityMethod,
     fitMethod: "stretch", premultiply: true, linearRGB: true,
   });
   checkAbort(signal);
   const data = new Uint8ClampedArray(resized.data);
-  if (s.preserveColors) {
-    const searchRadius = Math.ceil(Math.max(3, input.width / width * 3, input.height / height * 3));
-    // jSquash filters alpha; RGB is copied from the closest covered source pixel, never averaged.
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const i = (y * width + x) * 4;
-        if (!data[i + 3]) continue;
-        const fx = (x + .5) * input.width / width - .5, fy = (y + .5) * input.height / height - .5;
-        const sx = Math.max(0, Math.min(input.width - 1, Math.round(fx)));
-        const sy = Math.max(0, Math.min(input.height - 1, Math.round(fy)));
-        let best = (sy * input.width + sx) * 4;
-        if (!source[best + 3]) {
-          let distance = Infinity;
-          for (let dy = -searchRadius; dy <= searchRadius; dy++) for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-            const nx = sx + dx, ny = sy + dy;
-            if (nx < 0 || ny < 0 || nx >= input.width || ny >= input.height) continue;
-            const j = (ny * input.width + nx) * 4, d = (nx - fx) ** 2 + (ny - fy) ** 2;
-            if (source[j + 3] && d < distance) { best = j; distance = d; }
-          }
-          if (distance === Infinity) { data[i + 3] = 0; continue; }
+  const searchRadius = Math.ceil(Math.max(3, input.width / width * 3, input.height / height * 3));
+  // All kernels filter alpha; source RGB is mandatory for exact-color icon output.
+  // Never use the resampler's linear-light/premultiplied RGB as the final color.
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (!data[i + 3]) continue;
+      const fx = (x + .5) * input.width / width - .5, fy = (y + .5) * input.height / height - .5;
+      const sx = Math.max(0, Math.min(input.width - 1, Math.round(fx)));
+      const sy = Math.max(0, Math.min(input.height - 1, Math.round(fy)));
+      let best = (sy * input.width + sx) * 4;
+      if (!source[best + 3]) {
+        let distance = Infinity;
+        for (let dy = -searchRadius; dy <= searchRadius; dy++) for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+          const nx = sx + dx, ny = sy + dy;
+          if (nx < 0 || ny < 0 || nx >= input.width || ny >= input.height) continue;
+          const j = (ny * input.width + nx) * 4, d = (nx - fx) ** 2 + (ny - fy) ** 2;
+          if (source[j + 3] && d < distance) { best = j; distance = d; }
         }
-        data.set(source.subarray(best, best + 3), i);
+        if (distance === Infinity) { data[i + 3] = 0; continue; }
       }
-      if (y % 64 === 0) { await pause(); checkAbort(signal); }
+      data.set(source.subarray(best, best + 3), i);
     }
+    if (y % 64 === 0) { await pause(); checkAbort(signal); }
   }
   return { width, height, data };
 }

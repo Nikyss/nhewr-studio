@@ -1,5 +1,30 @@
 # Histórico de Versões
 
+## V1.0.4 · 10/09/2026
+
+### Correções de Cor e Transparência
+
+- Corrigida a conversão real de #FF0000 para #FE0000 na ampliação. Os três métodos de qualidade preservam obrigatoriamente os canais RGB da entrada, para qualquer HEX e para ícones multicoloridos.
+- Bilinear, Lanczos 3 e Magic Kernel usam jSquash/Squoosh para suavizar o alfa. Os contornos continuam distintos; nenhum método desativa a proteção de RGB.
+- Novo controle Corrigir opacidade residual transforma alfa 250–254 em 255 no resultado e no PNG. Preserva RGB e pixels com alfa 0, e pode ser desativado por imagem.
+- Verificação após redimensionamento/upscale corrige a opacidade residual recriada pelos filtros. Remoções, opacidade global e cores com transparência intencional continuam respeitadas.
+- Restaurar os ajustes mantém a proteção de opacidade ligada.
+- Tooltip mostra o alfa exato, como 254/255, sem arredondar pixels semitransparentes para 100% opacos.
+- Prévia por vizinho mais próximo reduz mistura de pixels no zoom; identificação explícita de RGB do arquivo no tooltip.
+
+### Distribuição e Verificação
+
+- INICIAR.bat, interface, metadados e documentação atualizados para V1.0.4. ZIP Windows com interface compilada e arquivo SHA-256; preservados o Node portátil automático e o processamento local.
+- 47 testes automatizados: cores, transparência, edição independente, exportação, ampliação 1×/2×/4× e servidor local.
+- Regressões incluem oito cores no pixel 331,896 da mascote, PNG exportado e reaberto sobre fundos claros/escuros, e os três métodos de qualidade com vermelho, laranja e azul.
+- Script de diagnóstico local: `npx tsx scripts/verify-png-color.ts entrada.png saida.png`. Verifica importação, reparo, PNG e composição, sem sobrescrever a entrada.
+
+### Limites
+
+- Bordas semitransparentes ainda se misturam com o fundo na tela. A proteção de RGB não promete igualdade entre RGB armazenado e cor composta nesses pixels.
+- JPG/WebP com perdas, mistura de cores, filtros, fundo preenchido e redimensionamento comum fora da aba Qualidade podem alterar o RGB.
+- Preservar RGB mantém divisões internas entre cores; a ampliação não recria detalhes ausentes nem interpola gradientes de fotografias.
+
 ## V1.0.3 · 10/09/2026
 
 ### Novidades
@@ -23,7 +48,6 @@
 - Testes de ida e volta garantem #FCAEE3 e #FF7020 exatos em PNG, incluindo alfa de 1 a 255.
 - Copiar a cor original para a nova cor usa o valor literal do campo.
 - Inspeção RGB opaca apenas na prévia, sem alterar a transparência exportada.
-- A prévia usa vizinho mais próximo, sem interpolação CSS, para que extensões que capturam a tela não convertam uma cor exata em um tom vizinho durante o zoom.
 - Layout adaptável a janelas estreitas; zoom mantém a imagem centrada ao redimensionar a janela. Rolagem por toque disponível fora da captura.
 - Restaurar Transparência ou Qualidade não apaga ajustes das outras ferramentas.
 - Ampliação combinada com tamanho personalizado faz uma só reamostragem, evitando perda intermediária de cor no modo RGB protegido.

@@ -21,8 +21,8 @@ export function ColorField({ label, value, onChange, onPick, active }: { label: 
   </div>{!valid && <small className="field-error">Cor inválida. Ex.: #1677AA, rgb(22,119,170), argb(128,22,119,170).</small>}</div>;
 }
 
-export function Toggle({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
-  const id = useId(); return <div className="toggle-row"><label htmlFor={id}>{label}</label><Switch id={id} checked={checked} onCheckedChange={onChange} disabled={disabled} /></div>;
+export function Toggle({ label, checked, onChange, disabled, description }: { label: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean; description?: string }) {
+  const id = useId(); return <div className="toggle-row"><label htmlFor={id} title={description}>{label}</label><Switch id={id} checked={checked} onCheckedChange={onChange} disabled={disabled} /></div>;
 }
 
 export function RangeField({ label, value, onChange, min = 0, max = 100, unit = "%", disabled }: { label: string; value: number; onChange: (n: number) => void; min?: number; max?: number; unit?: string; disabled?: boolean }) {

@@ -1,7 +1,7 @@
 import { converter, parse } from "culori";
 import pica from "pica";
 import { zipSync } from "fflate";
-import { defaultSettings, type Asset, type ExportFormat, type RGBA, type Settings } from "./editor-types";
+import { settingsForAsset, type Asset, type ExportFormat, type RGBA, type Settings } from "./editor-types";
 import { processPixels } from "./pixels";
 import { enhanceInWorker } from "./quality";
 import { checkDimensions, cropRaster, decodePng, pngBlob, rasterCanvas, readRaster, transformRaster, type Raster } from "./raster";
@@ -105,7 +105,7 @@ export async function importAsset(file: File): Promise<Asset> {
     const canvas = rasterCanvas(raster);
     const colors = extractColors(canvas);
     return { id: crypto.randomUUID(), name: file.name, size: file.size, width: canvas.width, height: canvas.height, url, canvas, colors,
-      settings: { ...defaultSettings, source: colors[0] ?? "", width: canvas.width, height: canvas.height }, past: [], future: [] };
+      settings: settingsForAsset({ width: canvas.width, height: canvas.height, colors }), past: [], future: [] };
   } catch (error) { URL.revokeObjectURL(url); throw error; }
 }
 
@@ -176,6 +176,16 @@ export async function renderAsset(asset: Asset, settings = asset.settings, signa
   if (settings.resizeEnabled && !settings.qualityEnabled) raster = readRaster(await resizeCanvas(rasterCanvas(raster), settings.width, settings.height));
   raster = await enhanceInWorker(raster, settings, signal);
   if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
+  // Resampling can recreate alpha 250-254 after the initial repair. Do not undo
+  // deliberately translucent targets, opacity adjustments or erasing operations.
+  const translucentTarget = settings.mode === "replace" ? replacementRGBA.some(rule => rule.targetRGBA[3] < 255)
+    : settings.mode === "solid" && (colorRGBA(settings.target)?.[3] ?? 255) < 255;
+  const intentionalAlpha = settings.opacity < 100 || translucentTarget ||
+    (settings.removeEnabled && removalRGBA.some(rule => rule.strength > 0)) ||
+    settings.eraseOperations.some(operation => operation.strength > 0);
+  if (settings.repairOpacity && !intentionalAlpha) {
+    for (let i = 3; i < raster.data.length; i += 4) if (raster.data[i] >= 250) raster.data[i] = 255;
+  }
   raster = transformRaster(raster, settings, settings.backgroundEnabled ? colorRGBA(settings.background) : null);
   return { canvas: rasterCanvas(raster), mask, changed: result.changed, visible: result.visible };
 }
