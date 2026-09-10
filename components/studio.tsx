@@ -65,6 +65,7 @@ export default function Studio() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#191919" : "#ffffff");
     try { localStorage.setItem("nhewr-theme", theme); } catch { /* Theme remains usable for this session. */ }
   }, [theme]);
 

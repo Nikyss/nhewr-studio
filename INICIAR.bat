@@ -6,5 +6,7 @@ if errorlevel 1 (
   echo.
   echo Nao foi possivel iniciar. Confira a mensagem acima.
   pause
+  exit /b 1
 )
 endlocal
+exit /b 0
