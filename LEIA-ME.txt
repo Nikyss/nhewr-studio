@@ -1,0 +1,52 @@
+NHEWR STUDIOS V1.0.2
+
+1. Extraia o ZIP inteiro para uma pasta do seu computador.
+2. Abra INICIAR.bat.
+3. O navegador padrao abre o editor automaticamente.
+
+Mantenha a janela do servidor aberta enquanto usa o editor.
+Para encerrar, pressione Ctrl+C nessa janela ou feche-a.
+
+O ZIP de distribuicao inclui a interface pronta. Se o computador nao
+tiver Node.js compativel, o inicializador baixa uma copia portatil
+oficial, verifica o SHA-256 e a guarda dentro da pasta .runtime.
+A primeira preparacao pode precisar de internet. Depois disso,
+o editor funciona sem conexao e nao envia suas imagens a servidores.
+
+Se voce baixou o codigo-fonte pelo GitHub (Code > Download ZIP),
+o mesmo INICIAR.bat instala as dependencias e monta a interface.
+
+MOUSE
+Roda: aproximar ou afastar somente a imagem sob o cursor.
+Arrastar: mover a imagem dentro da area de trabalho.
+Duplo clique: ajustar a imagem a area.
+Conta-gotas: veja a cor em tempo real e clique para captura-la.
+Com o conta-gotas ativo, use Alt+arrastar ou botao do meio para mover.
+Escape: sair do conta-gotas.
+
+Nenhuma cor de edicao vem predefinida. Escolha uma cor no seletor,
+digite HEX/RGB/ARGB/RGBA/HSL ou use o conta-gotas. O tema claro ou escuro afeta apenas a interface.
+
+PNG preserva as cores e a transparencia. JPG comprime com perdas.
+As imagens e o historico sao descartados quando a pagina e recarregada.
+Somente a paleta salva e o tema ficam gravados no navegador deste dispositivo.
+
+Windows 10/11 64 bits. Node.js 22.13 ou superior, ou portatil automatico.
+Se houver outro programa na porta 5173, uma porta livre sera escolhida.
+Nenhum aplicativo existente e encerrado pelo inicializador.
+
+Creditos do projeto: creditos\criador.txt
+
+VARIAS IMAGENS
+Importe varios arquivos juntos ou adicione mais durante a edicao.
+Cada imagem conserva seu original, ajustes e historico nesta sessao.
+Exportar baixa a imagem atual. Exportar lote permite escolher quais
+imagens entram no ZIP, cada uma com seus proprios ajustes por padrao.
+
+CORES
+HEX: #1677AA. RGB: rgb(22,119,170). ARGB: argb(128,22,119,170).
+ARGB usa alfa 0-255, primeiro. Tambem aceita 0x801677AA.
+HEX CSS com 8 digitos usa alfa no fim: #1677AA80.
+RGBA: rgba(22,119,170,0.5), com alfa 0-1.
+PNG mantem alfa 0 onde ja existe transparencia ou o fundo foi removido.
+Recolorir nao remove automaticamente fundos opacos da imagem original.

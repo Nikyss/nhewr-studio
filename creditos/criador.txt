@@ -1,0 +1,7 @@
+Nhewr Studios
+Criador: Nikyss
+GitHub: https://github.com/Nikyss
+Repositorio: https://github.com/Nikyss/nhewr-studio
+
+Mascote: imagem fornecida pelo criador do projeto.
+Bibliotecas de terceiros conservam suas respectivas licencas.

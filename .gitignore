@@ -1,0 +1,8 @@
+node_modules/
+.runtime/
+release/
+*.tsbuildinfo
+*.log
+.env*
+.playwright-cli/
+output/
