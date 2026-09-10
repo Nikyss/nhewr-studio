@@ -17,7 +17,7 @@ O pacote de distribuição inclui a interface compilada. No código-fonte baixad
 - Leitura de cor em tempo real junto ao cursor e no painel: HEX, RGBA, posição e transparência.
 - Zoom independente no original e no resultado, no ponto do cursor pela roda, arraste e ajuste com duplo clique. Cursor de seta durante a leitura de pixels.
 - Similaridade 0–100%, suavização de bordas, comparação e máscara de alterações exportável.
-- Remoção por cor, remoção apenas de áreas conectadas às bordas, opacidade e fundo.
+- Até 16 remoções por cor com ajustes próprios, além de borracha, balde por HEX, laço, opacidade e fundo.
 - Redimensionamento proporcional, recorte de margens, margem externa, rotação e espelhamento.
 - Melhoria de qualidade com jSquash/Squoosh em WebAssembly: ampliação 1×/2×/4×, suavização do contorno transparente, RGB protegido, Lanczos 3 e Magic Kernel.
 - Escala de cinza e inversão de cores.
@@ -25,7 +25,7 @@ O pacote de distribuição inclui a interface compilada. No código-fonte baixad
 - Importação PNG/JPG/WebP/SVG/ICO por arquivos, arrastar ou colar.
 - Exportação PNG por padrão, WebP/JPG/ICO, cópia PNG e lote ZIP com seleção de arquivos e nomes exclusivos. Por padrão cada imagem mantém seus próprios ajustes.
 
-Com o conta-gotas ativo, Alt+arrastar ou botão do meio move a imagem. Escape sai da captura. O fundo da prévia não é adicionado ao arquivo exportado. O original é preservado.
+Com o conta-gotas ou uma ferramenta manual ativa, Alt+arrastar ou botão do meio move a imagem. Borracha, balde e laço atuam na prévia Original e entram no histórico de desfazer/refazer. Escape sai da captura ou cancela o gesto atual. O fundo da prévia não é adicionado ao arquivo exportado. O original é preservado.
 
 ## Desenvolvimento
 
@@ -87,15 +87,19 @@ Preservar RGB vale para a etapa de qualidade: mesclar cores na aba de cor, filtr
 
 ## Fundo e Transparência
 
-- **Ativar remoção** apaga a cor escolhida no original. Pode ser usada junto com recoloração.
+- **Por cor** apaga a cor escolhida no original e pode ser usada junto com recoloração. Cada faixa fixada conserva cor, intensidade, tons parecidos, suavização e alcance próprios; até 16 faixas podem atuar ao mesmo tempo.
+- **Fixar e adicionar outra** preserva a faixa atual antes de escolher o próximo HEX. Também é possível editar ou excluir cada faixa separadamente.
 - **Fundo conectado às bordas** preserva regiões fechadas da mesma cor dentro do desenho. **Toda a imagem** remove também essas regiões.
 - **Intensidade da remoção**: começa em 0%. A cor escolhida só vai desaparecendo conforme o controle avança; 100% apaga completamente.
 - **Incluir tons parecidos**: 0% afeta apenas o RGB exato; aumentar inclui cores semelhantes.
 - **Suavização do recorte**: mantém os pixels selecionados totalmente transparentes e reduz parcialmente o alfa dos vizinhos do recorte, sem misturar RGB. Não é remoção por IA nem descontaminação de halos coloridos.
+- **Borracha** remove somente o traço feito na imagem, com diâmetro e intensidade ajustáveis.
+- **Balde** captura o RGB clicado e remove de uma vez todos os pixels iguais ou próximos no arquivo.
+- **Laço** acompanha uma linha livre e remove tudo dentro da área quando o gesto é fechado. As ações manuais podem ser desfeitas ou limpas sem alterar o original.
 - **Opacidade**: 100% mantém o alfa original, 0% deixa o ícone invisível. Não torna pixels transparentes opacos.
 - **Preservar transparência** não acrescenta um fundo e não remove automaticamente um fundo já presente. **Preencher com uma cor** adiciona a cor escolhida ao arquivo exportado.
 
-Restaurar esta ferramenta, em Transparência ou Qualidade, restaura apenas os controles dessa aba. Restaurar original, na área de trabalho, continua restaurando todos os ajustes.
+Restaurar esta ferramenta, em Transparência ou Qualidade, restaura apenas os controles dessa aba. Restaurar original, na área de trabalho, continua restaurando todos os ajustes. As ferramentas manuais usam coordenadas do original antes de recorte, redimensionamento ou rotação.
 
 ## Pacote de Distribuição
 

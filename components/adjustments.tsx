@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ArrowDown, BookmarkPlus, Copy, Download, FlipHorizontal2, FlipVertical2, Link2, Palette, Pencil, Plus, RotateCcw, RotateCw, Trash2, Unlink2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { ColorField, Choice, IconButton, RangeField, Toggle } from "./editor-controls";
+import TransparencyAdjustments from "./transparency-adjustments";
 import type { Asset, Settings, ToolId } from "@/lib/editor-types";
 import { colorCSS, colorRGBA, download } from "@/lib/image-editor";
 
@@ -19,7 +20,7 @@ export default function Adjustments({ asset, settings: s, tool, patch, picking, 
   const [newColor, setNewColor] = useState("");
   const paletteInput = useRef<HTMLInputElement>(null);
   const heading = { colors: "Ajustes de cor", alpha: "Fundo e transparência", size: "Tamanho e margens", quality: "Qualidade da imagem", transform: "Transformar imagem", palette: "Cores salvas" };
-  const resetPanel = () => tool === "alpha" ? patch({ removeEnabled: false, removeColor: "", removeStrength: 0, removeTolerance: 10, removeFeather: 0, edgeOnly: true, opacity: 100, backgroundEnabled: false, background: "" }) : tool === "quality" ? patch({ qualityEnabled: false, qualityScale: 2, edgeSoftness: 35, preserveColors: true, qualityMethod: "lanczos3" }) : reset();
+  const resetPanel = () => tool === "alpha" ? patch({ removeEnabled: false, removeColor: "", removeStrength: 0, removeTolerance: 10, removeFeather: 0, edgeOnly: true, removals: [], eraseTool: "color", eraseSize: 32, eraseStrength: 100, eraseTolerance: 0, eraseOperations: [], opacity: 100, backgroundEnabled: false, background: "" }) : tool === "quality" ? patch({ qualityEnabled: false, qualityScale: 2, edgeSoftness: 35, preserveColors: true, qualityMethod: "lanczos3" }) : reset();
   const panelHeading = <div className="panel-heading"><h2>{heading[tool]}</h2><IconButton label={tool === "alpha" || tool === "quality" ? "Restaurar esta ferramenta" : "Restaurar ajustes"} onClick={resetPanel} disabled={!asset}><RotateCcw size={16} /></IconButton></div>;
   if (tool === "palette") return <>{panelHeading}<div className="control-section"><ColorField label="Nova cor da paleta" value={newColor} onChange={setNewColor} /><button className="button secondary wide" onClick={() => { saveColor(newColor); if (colorRGBA(newColor)) setNewColor(""); }} disabled={!colorRGBA(newColor)}><BookmarkPlus size={16} />Salvar cor</button></div><div className="control-section"><div className="section-heading palette-heading"><h3>Minha paleta <span className="count">{saved.length}</span></h3><IconButton label="Importar paleta JSON" onClick={() => paletteInput.current?.click()}><Upload size={16} /></IconButton><IconButton label="Exportar paleta JSON" disabled={!saved.length} onClick={() => download(new Blob([JSON.stringify({ version: 1, colors: saved }, null, 2)], { type: "application/json" }), "minha-paleta.json")}><Download size={16} /></IconButton></div><input ref={paletteInput} type="file" accept=".json,application/json" hidden onChange={async e => {
       const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
@@ -29,17 +30,7 @@ export default function Adjustments({ asset, settings: s, tool, patch, picking, 
         setSavedColors([...new Set([...saved, ...list])].slice(-40)); toast.success("Paleta importada.");
       } catch { toast.error("Paleta inválida. Use um JSON com até 40 cores válidas."); }
     }} />{saved.length ? <div className="saved-colors">{saved.map(c => <div className="saved-color-row" key={c}><button className="saved-color-use" disabled={!asset} onClick={() => { patch({ target: c, mode: s.mode === "none" ? "replace" : s.mode }); toast.success("Cor aplicada ao ícone atual."); }} aria-label={`Aplicar ${c}`}><span className="swatch" style={{ background: colorCSS(c) }} /><code>{c}</code></button><IconButton label={`Excluir cor ${c}`} onClick={() => removeColor(c)}><Trash2 size={15} /></IconButton></div>)}</div> : <div className="palette-empty"><Palette size={30} strokeWidth={1.2} /><span>Nenhuma cor salva</span></div>}</div></>;
-  if (tool === "alpha") return <>{panelHeading}<fieldset className="controls-body" disabled={!asset}>
-    <section className="control-section"><h3>Remover fundo por cor</h3><Toggle label="Ativar remoção" checked={s.removeEnabled} onChange={removeEnabled => patch({ removeEnabled })} />
-      {s.removeEnabled && <><ColorField label="Cor a apagar" value={s.removeColor} onChange={removeColor => patch({ removeColor, removeStrength: 0 })} onPick={() => pick("removeColor")} active={picking === "removeColor"} />
-        <RangeField label="Intensidade da remoção" value={s.removeStrength} onChange={removeStrength => patch({ removeStrength })} />
-        <div className="range-endpoints"><span>0% · manter</span><span>100% · apagar</span></div>
-        <Choice label="Onde apagar" value={s.edgeOnly ? "edge" : "all"} onChange={v => patch({ edgeOnly: v === "edge" })} options={[{ value: "edge", label: "Fundo conectado às bordas" }, { value: "all", label: "Toda a imagem" }]} />
-        <RangeField label="Incluir tons parecidos" value={s.removeTolerance} onChange={removeTolerance => patch({ removeTolerance })} />
-        <RangeField label="Suavização do recorte" value={s.removeFeather} onChange={removeFeather => patch({ removeFeather })} /></>}
-    </section><section className="control-section"><h3>Visibilidade do ícone</h3><RangeField label="Opacidade" value={s.opacity} onChange={opacity => patch({ opacity })} /><div className="range-endpoints"><span>0% · invisível</span><span>100% · original</span></div></section>
-    <section className="control-section"><h3>Fundo do arquivo</h3><Choice label="Fundo de saída" value={s.backgroundEnabled ? "color" : "transparent"} onChange={v => patch({ backgroundEnabled: v === "color" })} options={[{ value: "transparent", label: "Preservar transparência" }, { value: "color", label: "Preencher com uma cor" }]} />{s.backgroundEnabled && <ColorField label="Cor do fundo" value={s.background} onChange={background => patch({ background })} />}</section>
-  </fieldset></>;
+  if (tool === "alpha") return <>{panelHeading}<TransparencyAdjustments asset={asset} settings={s} patch={patch} picking={picking} pick={pick} /></>;
   if (tool === "quality") {
     const width = (s.resizeEnabled ? s.width : asset?.width ?? 0) * s.qualityScale;
     const height = (s.resizeEnabled ? s.height : asset?.height ?? 0) * s.qualityScale;

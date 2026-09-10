@@ -41,10 +41,13 @@ export function colorCSS(value: string) {
 export function validateSettings(s: Settings) {
   if (s.mode === "replace" && s.target && !colorRGBA(s.source)) throw new Error("Selecione uma cor original válida.");
   if (s.mode !== "none" && s.target && !colorRGBA(s.target)) throw new Error("A nova cor é inválida.");
-  if (s.removeEnabled && !colorRGBA(s.removeColor)) throw new Error("Escolha a cor que será removida.");
+  if (s.removeEnabled && s.removeStrength > 0 && !colorRGBA(s.removeColor)) throw new Error("Escolha a cor que será removida.");
   if (s.backgroundEnabled && !colorRGBA(s.background)) throw new Error("Escolha a cor de fundo.");
   if (s.replacements.length > 16) throw new Error("Use no máximo 16 trocas de cor por imagem.");
   if (s.replacements.some(rule => !colorRGBA(rule.source) || !colorRGBA(rule.target))) throw new Error("Há uma troca de cor inválida.");
+  if (s.removals.length > 16) throw new Error("Use no máximo 16 remoções por cor em cada imagem.");
+  if (s.removals.some(rule => !colorRGBA(rule.color) || rule.strength < 0 || rule.strength > 100 || rule.tolerance < 0 || rule.tolerance > 100 || rule.feather < 0 || rule.feather > 100)) throw new Error("Há uma remoção por cor inválida.");
+  if (s.eraseOperations.length > 80 || s.eraseOperations.some(operation => operation.strength < 0 || operation.strength > 100 || (operation.type === "eraser" && (operation.size < 1 || operation.size > 512 || operation.points.length > 2048)) || (operation.type === "bucket" && (operation.tolerance < 0 || operation.tolerance > 100)) || (operation.type === "lasso" && operation.points.length > 2048))) throw new Error("Há uma remoção manual inválida ou grande demais.");
 }
 export function bytes(size: number) { return size < 1024 ? `${size} B` : size < 1_048_576 ? `${(size / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} KB` : `${(size / 1_048_576).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`; }
 
@@ -134,12 +137,19 @@ export async function renderAsset(asset: Asset, settings = asset.settings, signa
     const sourceRGBA = colorRGBA(settings.source), targetRGBA = colorRGBA(settings.target);
     if (sourceRGBA && targetRGBA) replacementRGBA.push({ sourceRGBA, targetRGBA });
   }
+  const removalRGBA = settings.removals.flatMap(rule => {
+    const colorRGBAValue = colorRGBA(rule.color);
+    return colorRGBAValue ? [{ colorRGBA: colorRGBAValue, strength: rule.strength, tolerance: rule.tolerance, feather: rule.feather, edgeOnly: rule.edgeOnly }] : [];
+  });
+  const currentRemoval = colorRGBA(settings.removeColor);
+  if (currentRemoval) removalRGBA.push({ colorRGBA: currentRemoval, strength: settings.removeStrength, tolerance: settings.removeTolerance, feather: settings.removeFeather, edgeOnly: settings.edgeOnly });
   const pixelSettings = {
     ...settings,
     sourceRGBA: colorRGBA(settings.source),
     targetRGBA: colorRGBA(settings.target),
     removeRGBA: colorRGBA(settings.removeColor),
     replacementRGBA,
+    removalRGBA,
     paletteRGBA: asset.colors.flatMap(color => { const value = colorRGBA(color); return value ? [value] : []; }),
   };
   type Result = ReturnType<typeof processPixels>;

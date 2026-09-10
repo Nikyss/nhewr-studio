@@ -22,6 +22,8 @@ Arrastar: mover a imagem dentro da area de trabalho.
 Duplo clique: ajustar a imagem a area.
 Conta-gotas: veja a cor em tempo real e clique para captura-la.
 Com o conta-gotas ativo, use Alt+arrastar ou botao do meio para mover.
+Borracha, balde e laco atuam na imagem Original. Alt+arrastar ou botao
+do meio continua movendo a imagem quando uma dessas ferramentas esta ativa.
 Escape: sair do conta-gotas.
 
 Nenhuma cor de edicao vem predefinida. Escolha uma cor no seletor,
@@ -42,6 +44,9 @@ Melhorar qualidade: ampliacao 1x/2x/4x com jSquash/Squoosh WebAssembly,
 contorno transparente mais suave e RGB protegido para icones.
 Nao usa IA e nao recupera detalhes ausentes no arquivo pequeno.
 Transparencia com remocao gradual de 0% a 100% e suavizacao do recorte.
+Fixe ate 16 faixas de remocao por cor sem perder as anteriores.
+Borracha apaga tracos, balde remove o HEX clicado em toda a imagem e
+laco apaga o interior da linha fechada. Todas entram no historico.
 Menos bordas decorativas, exemplo com a mascote e correcoes de RGB no PNG.
 Varias trocas de cor podem ser fixadas na mesma imagem. A opcao de
 padronizacao une tons quase iguais e preserva cores muito diferentes.

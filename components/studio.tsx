@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { defaultSettings, type Asset, type ExportFormat, type Settings, type ToolId } from "@/lib/editor-types";
+import { defaultSettings, type Asset, type ExportFormat, type ManualEraseOperation, type Settings, type ToolId } from "@/lib/editor-types";
 import { bytes, canvasBlob, colorHex, colorRGBA, download, exportBlob, importAsset, makeZip, MAX_SESSION_PIXELS, renderAsset, safeName, validateSettings } from "@/lib/image-editor";
 import { Choice, ColorField, IconButton, RangeField, Toggle } from "./editor-controls";
 import Adjustments from "./adjustments";
@@ -101,6 +101,10 @@ export default function Studio() {
     configure: (value: ColorConfiguration) => { if (!active) throw new Error("Importe um ícone antes de configurar as cores."); validateSettings({ ...s, ...value }); flushSync(() => patch(value)); return { status: "configured", selectedId: activeId, preview: "processing" }; },
   };
   useEffect(() => registerEditorTools(() => agentActions.current), []);
+
+  useEffect(() => {
+    if (tool === "alpha" && s.eraseTool !== "color") { setView("split"); setPicking(null); }
+  }, [tool, s.eraseTool]);
 
   const history = useCallback((redo = false) => {
     lastEdit.current = { key: "", time: 0 };
@@ -214,6 +218,10 @@ export default function Studio() {
 
   const sample = (color: string) => { if (picking) { patch(picking === "removeColor" ? { removeColor: color, removeStrength: 0 } : { [picking]: color }); setPicking(null); toast.success(`Cor capturada: ${color.toUpperCase()}`); } };
   const reset = () => active && patch({ ...defaultSettings, width: active.width, height: active.height, source: active.colors[0] ?? "" });
+  const eraseControl = active && tool === "alpha" && s.eraseTool !== "color" && !picking ? {
+    tool: s.eraseTool, size: s.eraseSize, strength: s.eraseStrength, tolerance: s.eraseTolerance,
+    onCommit: (operation: ManualEraseOperation) => patch({ eraseOperations: [...s.eraseOperations, operation].slice(-80) }),
+  } : undefined;
 
   return <TooltipProvider delayDuration={250}><div className="studio" onDragOver={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDrag(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDrag(false); }} onDrop={e => { e.preventDefault(); setDrag(false); void importFiles([...e.dataTransfer.files]); }}>
     <input ref={fileInput} type="file" accept=".png,.jpg,.jpeg,.webp,.svg,.ico" multiple hidden onChange={e => { void importFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
@@ -229,7 +237,7 @@ export default function Studio() {
         {inspectRgb && <div className="inspection-status"><ScanEye size={14} />Inspeção RGB · alfa oculto somente na prévia</div>}
         <div className={`previews ${view === "result" ? "result-only" : ""}`}>
           {view === "split" && <section className="preview-panel"><header><span><span className="preview-dot" />Original</span><div>{active && <small>{active.width} × {active.height} px</small>}<IconButton label="Copiar original" disabled={!active} onClick={() => copyResult(true)}><Copy size={15} /></IconButton><IconButton label="Baixar original" disabled={!active} onClick={() => active && canvasBlob(active.canvas).then(blob => download(blob, `${safeName(active.name)}-original.png`)).catch(() => toast.error("Falha ao baixar original."))}><ArrowDownToLine size={15} /></IconButton></div></header>
-            {active ? <Preview key={`${active.id}-original`} canvas={active.canvas} label="Imagem original" background={background} inspectRgb={inspectRgb} onHover={setLivePixel} onSample={picking ? sample : undefined} /> : <div className="import-area checker"><div className="import-symbol"><ImagePlus size={32} strokeWidth={1.25} /></div><h2>Seu próximo ícone começa aqui</h2><button className="button primary" onClick={() => fileInput.current?.click()}><Plus size={16} />Abrir arquivos</button><span className="file-formats">PNG, JPG, WebP, SVG e ICO</span><button className="text-action example-action" onClick={example}>Abrir ícone de exemplo <ChevronRight size={14} /></button></div>}
+            {active ? <Preview key={`${active.id}-original`} canvas={active.canvas} label="Imagem original" background={background} inspectRgb={inspectRgb} onHover={setLivePixel} onSample={picking ? sample : undefined} erase={eraseControl} /> : <div className="import-area checker"><div className="import-symbol"><ImagePlus size={32} strokeWidth={1.25} /></div><h2>Seu próximo ícone começa aqui</h2><button className="button primary" onClick={() => fileInput.current?.click()}><Plus size={16} />Abrir arquivos</button><span className="file-formats">PNG, JPG, WebP, SVG e ICO</span><button className="text-action example-action" onClick={example}>Abrir ícone de exemplo <ChevronRight size={14} /></button></div>}
             <footer><span>{active ? active.name : "Nenhum ícone aberto"}</span>{active && <small>{bytes(active.size)}</small>}</footer></section>}
           <section className="preview-panel output-panel"><header><span><span className="preview-dot result-dot" />{mask ? "Máscara" : "Resultado"}</span><div>{active && <small>{!ready && !renderError ? <LoaderCircle size={14} className="spin" /> : output ? `${mask ? active.width : output.canvas.width} × ${mask ? active.height : output.canvas.height} px` : ""}</small>}{mask && <IconButton label="Baixar máscara de alterações" disabled={!output} onClick={() => output && canvasBlob(output.mask).then(blob => download(blob, "mascara-de-alteracoes.png")).catch(() => toast.error("Falha ao baixar máscara."))}><Download size={15} /></IconButton>}<IconButton label="Copiar resultado" onClick={() => copyResult()} disabled={!active}><Copy size={15} /></IconButton></div></header>
             {renderError ? <div className="render-error"><ScanLine size={28} /><p>{renderError}</p></div> : <Preview key={`${active?.id ?? "empty"}-result`} canvas={output ? mask ? output.mask : output.canvas : undefined} label={mask ? "Máscara: preto indica pixels alterados; branco, pixels preservados" : "Imagem resultante"} background={background} inspectRgb={inspectRgb} onHover={setLivePixel} onSample={picking && output && !mask ? sample : undefined} />}

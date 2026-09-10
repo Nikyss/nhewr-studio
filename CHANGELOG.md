@@ -10,6 +10,9 @@
 - O botão Abrir ícone de exemplo usa a mascote PNG original do Nhewr Studios, com transparência, sem redesenhar nem recomprimir o anexo.
 - Transparência reorganizada em remoção por cor, visibilidade do ícone e fundo do arquivo. Novo controle de suavização do recorte.
 - Remoção por cor agora começa em 0% e altera o alfa gradualmente até 100%, sem apagar imediatamente ao capturar a cor.
+- Até 16 faixas de remoção por cor podem ser fixadas, editadas e excluídas; cada uma mantém sua própria intensidade, tolerância, suavização e alcance.
+- Novas ferramentas Borracha, Balde e Laço removem áreas diretamente na prévia Original e permanecem reversíveis no histórico da imagem.
+- O Balde remove globalmente o HEX clicado, com tolerância ajustável. O Laço remove o interior da linha fechada.
 - Até 16 trocas de cor podem ser fixadas, editadas e removidas por imagem; começar uma nova captura preserva a troca anterior.
 - Nova padronização de tons próximos reduz variações HEX pequenas e mantém cores claramente diferentes.
 - Menos contornos decorativos nas prévias, seções de ajustes, botões secundários e itens selecionados. Temas neutros claro e escuro preservados.
@@ -27,7 +30,7 @@
 ### Distribuição e Verificação
 
 - ZIP Windows com interface pronta, INICIAR.bat atualizado, documentação e arquivo SHA-256. Node.js portátil automático quando necessário, sem conta e sem envio de imagens.
-- Suíte automatizada cobre PNG/alfa, formatos de cor, remoção gradual, múltiplas trocas, padronização, ampliação, limites, cancelamento, edição independente, exportação e servidor local.
+- Suíte automatizada cobre PNG/alfa, formatos de cor, remoção gradual e múltipla, borracha, balde, laço, múltiplas trocas, padronização, ampliação, limites, cancelamento, edição independente, exportação e servidor local.
 - Verificações de navegador incluem exemplo PNG, ferramentas, exportação e layout em diferentes larguras.
 
 ### Limitações Importantes

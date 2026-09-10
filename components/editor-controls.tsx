@@ -29,6 +29,6 @@ export function RangeField({ label, value, onChange, min = 0, max = 100, unit = 
   const id = useId(); return <div className="field range-field"><div className="field-heading"><label htmlFor={id}>{label}</label><div className="number-unit"><input id={id} type="number" min={min} max={max} value={value} disabled={disabled} onChange={e => { if (e.target.value !== "") onChange(Math.max(min, Math.min(max, Number(e.target.value)))); }} /><span>{unit}</span></div></div><Slider aria-label={label} value={[value]} min={min} max={max} step={1} disabled={disabled} onValueChange={([n]) => onChange(n)} /></div>;
 }
 
-export function Choice({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) {
-  const id = useId(); return <div className="field"><label htmlFor={id}>{label}</label><Select value={value} onValueChange={onChange}><SelectTrigger id={id} className="choice-select"><SelectValue /></SelectTrigger><SelectContent>{options.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select></div>;
+export function Choice({ label, value, onChange, options, hideLabel = false }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[]; hideLabel?: boolean }) {
+  const id = useId(); return <div className="field"><label htmlFor={id} className={hideLabel ? "sr-only" : undefined}>{label}</label><Select value={value} onValueChange={onChange}><SelectTrigger id={id} aria-label={label} className="choice-select"><SelectValue /></SelectTrigger><SelectContent>{options.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select></div>;
 }

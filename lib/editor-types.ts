@@ -6,6 +6,21 @@ export interface ColorReplacement {
   target: string;
 }
 
+export interface ColorRemoval {
+  id: string;
+  color: string;
+  strength: number;
+  tolerance: number;
+  feather: number;
+  edgeOnly: boolean;
+}
+
+export type ErasePoint = { x: number; y: number };
+export type ManualEraseOperation =
+  | { type: "eraser"; points: ErasePoint[]; size: number; strength: number }
+  | { type: "bucket"; point: ErasePoint; tolerance: number; strength: number }
+  | { type: "lasso"; points: ErasePoint[]; strength: number };
+
 export interface Settings {
   mode: "replace" | "solid" | "none";
   source: string;
@@ -22,6 +37,12 @@ export interface Settings {
   removeTolerance: number;
   edgeOnly: boolean;
   removeFeather: number;
+  removals: ColorRemoval[];
+  eraseTool: "color" | "eraser" | "bucket" | "lasso";
+  eraseSize: number;
+  eraseStrength: number;
+  eraseTolerance: number;
+  eraseOperations: ManualEraseOperation[];
   opacity: number;
   backgroundEnabled: boolean;
   background: string;
@@ -46,7 +67,8 @@ export const defaultSettings: Settings = {
   mode: "replace", source: "", target: "", tolerance: 10,
   smooth: false, radius: 1, replacements: [], normalizeEnabled: false, normalizeTolerance: 8,
   removeEnabled: false, removeColor: "", removeStrength: 0,
-  removeTolerance: 10, edgeOnly: true, removeFeather: 0, opacity: 100,
+  removeTolerance: 10, edgeOnly: true, removeFeather: 0, removals: [],
+  eraseTool: "color", eraseSize: 32, eraseStrength: 100, eraseTolerance: 0, eraseOperations: [], opacity: 100,
   backgroundEnabled: false, background: "", resizeEnabled: false,
   width: 512, height: 512, lockRatio: true, rotation: 0, flipX: false,
   flipY: false, trim: false, padding: 0, filter: "none",
@@ -69,11 +91,13 @@ export interface Asset {
 }
 
 export type ResolvedReplacement = { sourceRGBA: RGBA; targetRGBA: RGBA };
+export type ResolvedRemoval = Omit<ColorRemoval, "id" | "color"> & { colorRGBA: RGBA };
 export type PixelSettings = Settings & {
   sourceRGBA: RGBA | null;
   targetRGBA: RGBA | null;
   removeRGBA: RGBA | null;
   replacementRGBA?: ResolvedReplacement[];
+  removalRGBA?: ResolvedRemoval[];
   paletteRGBA?: RGBA[];
 };
 export type ToolId = "colors" | "alpha" | "size" | "quality" | "transform" | "palette";

@@ -124,7 +124,12 @@ h1 { margin: 0; font-size: 25px; font-weight: 600; line-height: 1.25; }
 .canvas-stage.interactive-stage { flex: 1; position: relative; min-height: 0; overflow: hidden; touch-action: none; cursor: default; user-select: none; }
 .canvas-stage.interactive-stage canvas { display: block; margin: 0; pointer-events: none; }
 .canvas-stage.interactive-stage.sampling { cursor: default; outline: 1px solid var(--ring); outline-offset: -1px; }
+.canvas-stage.interactive-stage.manual-edit { cursor: crosshair; touch-action: none; }
 .canvas-stage.interactive-stage.panning { cursor: grabbing; }
+.erase-overlay { pointer-events: none; overflow: visible; color: var(--foreground); z-index: 1; }
+.erase-overlay polyline { opacity: .4; }
+.manual-edit.lasso .erase-overlay polyline, .erase-overlay polygon { fill: #7f7f7f26; stroke: var(--foreground); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; opacity: .8; }
+.erase-cursor { position: absolute; transform: translate(-50%, -50%); border: 1px solid #ffffff; border-radius: 50%; box-shadow: 0 0 0 1px #00000099; pointer-events: none; z-index: 2; }
 .preview-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100%; width: 100%; color: var(--muted-foreground); font-size: 13px; }
 .preview-panel > footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 38px; padding: 9px 12px; font-size: 11px; color: var(--muted-foreground); }
 .preview-panel > footer > span { display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -212,6 +217,19 @@ h1 { margin: 0; font-size: 25px; font-weight: 600; line-height: 1.25; }
 .replacement-edit code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
 .replacement-edit:hover { background: var(--accent); }
 .replacement-row > .icon-button { width: 27px; }
+.erase-tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 4px; border-radius: 6px; background: var(--secondary); }
+.erase-tool { min-width: 0; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 4px; background: transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 600; }
+.erase-tool:hover { color: var(--foreground); background: var(--accent); }
+.erase-tool[aria-pressed=true] { color: var(--primary-foreground); background: var(--primary); }
+.erase-tool-controls { margin-top: 20px; }
+.removal-edit { display: grid; grid-template-columns: 24px minmax(0, 1fr) 16px; align-items: center; gap: 8px; min-width: 0; flex: 1; border: 0; border-radius: 4px; background: transparent; color: var(--foreground); padding: 7px; text-align: left; }
+.removal-edit:hover { background: var(--accent); }
+.removal-edit > .swatch { width: 22px; height: 22px; }
+.removal-edit > span:nth-child(2) { min-width: 0; }
+.removal-edit code, .removal-edit small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.removal-edit code { font-family: var(--font-mono); font-size: 11px; }
+.removal-edit small { margin-top: 2px; color: var(--muted-foreground); font-size: 9px; }
+.manual-removal-summary { margin-top: 18px; min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 5px; background: var(--secondary); color: var(--muted-foreground); font-size: 11px; }
 .palette-empty { padding: 22px 0 12px; display: grid; justify-items: center; gap: 13px; font-size: 13px; color: var(--muted-foreground); }
 .dimensions { display: grid; grid-template-columns: minmax(0,1fr) 30px minmax(0,1fr); gap: 7px; align-items: end; margin: 20px 0; }
 .dimensions .field { margin: 0; }
@@ -268,7 +286,7 @@ h1 { margin: 0; font-size: 25px; font-weight: 600; line-height: 1.25; }
   .control-section { padding-block: 18px; }
 }
 .inspection-status { display: flex; gap: 7px; align-items: center; color: var(--muted-foreground); font-size: 12px; padding-bottom: 10px; }
-.canvas-stage.interactive-stage:not(.sampling) { touch-action: pan-y pinch-zoom; }
+.canvas-stage.interactive-stage:not(.sampling):not(.manual-edit) { touch-action: pan-y pinch-zoom; }
 .preview-navigation .icon-button { font-size: 10px; min-width: 30px; }
 @media (min-width: 821px) and (max-width: 1100px) {
   .editor-layout[data-slot=sidebar-wrapper] { grid-template-columns: 62px minmax(0,1fr) 284px; }

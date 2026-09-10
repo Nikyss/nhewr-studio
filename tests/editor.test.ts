@@ -80,7 +80,7 @@ test("color formats are parsed consistently; invalid input is rejected", () => {
   assert.deepEqual(colorRGBA("hsl(0, 100%, 50%)"), [255, 0, 0, 255]);
   assert.equal(colorRGBA("#GGGGGG"), null);
   assert.throws(() => validateSettings({ ...defaultSettings, target: "#GGGGGG" }));
-  assert.throws(() => validateSettings({ ...defaultSettings, removeEnabled: true }));
+  assert.throws(() => validateSettings({ ...defaultSettings, removeEnabled: true, removeColor: "#GGGGGG", removeStrength: 50 }));
 });
 test("dimension limits prevent oversized output canvases", () => {
   assert.throws(() => createCanvas(0, 20)); assert.throws(() => createCanvas(8193, 1)); assert.throws(() => createCanvas(5000, 5000));
@@ -302,6 +302,63 @@ test("background removal progresses from 0 to 50 to 100 percent", () => {
   assert.equal(processPixels(input,1,1,{...config,removeStrength:0}).data[3],255);
   assert.equal(processPixels(input,1,1,{...config,removeStrength:50}).data[3],128);
   assert.equal(processPixels(input,1,1,{...config,removeStrength:100}).data[3],0);
+});
+
+test("multiple fixed color removals retain independent strengths", () => {
+  const input = new Uint8ClampedArray([255,0,0,255,0,255,0,255,0,0,255,255]);
+  const result = processPixels(input,3,1,{...options,mode:"none",removeEnabled:true,removeRGBA:null,removalRGBA:[
+    {colorRGBA:[255,0,0,255],strength:50,tolerance:0,feather:0,edgeOnly:false},
+    {colorRGBA:[0,255,0,255],strength:100,tolerance:0,feather:0,edgeOnly:false},
+  ]});
+  assert.equal(result.data[3],128);
+  assert.equal(result.data[7],0);
+  assert.equal(result.data[11],255);
+});
+
+test("fixed removals remain valid while the next color slot is empty", () => {
+  assert.doesNotThrow(() => validateSettings({
+    ...defaultSettings,
+    mode: "none",
+    removeEnabled: true,
+    removals: [{ id: "red", color: "#FF0000", strength: 100, tolerance: 0, feather: 0, edgeOnly: false }],
+  }));
+});
+
+test("paint bucket removes every matching HEX while preserving other colors", () => {
+  const input = new Uint8ClampedArray([255,0,0,255,0,0,255,255,255,0,0,255]);
+  const result = processPixels(input,3,1,{...options,mode:"none",removeEnabled:false,eraseOperations:[{type:"bucket",point:{x:.5,y:.5},tolerance:0,strength:100}]});
+  assert.equal(result.data[3],0);
+  assert.equal(result.data[7],255);
+  assert.equal(result.data[11],0);
+});
+
+test("eraser stroke changes only pixels covered by its diameter", () => {
+  const input = new Uint8ClampedArray(5*5*4);
+  for(let n=0;n<25;n++) input.set([120,80,40,255],n*4);
+  const result = processPixels(input,5,5,{...options,mode:"none",eraseOperations:[{type:"eraser",points:[{x:2.5,y:2.5}],size:1,strength:100}]});
+  assert.equal(result.data[(2*5+2)*4+3],0);
+  assert.equal(result.data[3],255);
+});
+
+test("lasso removes its closed interior and leaves exterior pixels intact", () => {
+  const input = new Uint8ClampedArray(5*5*4);
+  for(let n=0;n<25;n++) input.set([40,80,120,255],n*4);
+  const points = [{x:1,y:1},{x:4,y:1},{x:4,y:4},{x:1,y:4}];
+  const result = processPixels(input,5,5,{...options,mode:"none",eraseOperations:[{type:"lasso",points,strength:100}]});
+  assert.equal(result.data[(2*5+2)*4+3],0);
+  assert.equal(result.data[3],255);
+  assert.equal(result.data[(4*5+4)*4+3],255);
+});
+
+test("rendered manual removal changes alpha without altering stored RGB", async () => {
+  const asset = fixture();
+  const result = await renderAsset(asset, {
+    ...asset.settings,
+    mode: "none",
+    eraseOperations: [{ type: "eraser", points: [{ x: 3.5, y: 3.5 }], size: 2, strength: 100 }],
+  });
+  assert.deepEqual([...result.canvas.getContext("2d")!.getImageData(3, 3, 1, 1).data], [0, 0, 0, 0]);
+  assert.deepEqual([...asset.canvas.getContext("2d")!.getImageData(3, 3, 1, 1).data], [0, 0, 0, 255]);
 });
 
 test("quality composes with recolor, resize and independent image settings", async () => {
